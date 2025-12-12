@@ -940,46 +940,49 @@ export class InitCommand {
     const toolName = this.formatToolNames(selectedTools);
 
     console.log();
-    console.log(`Next steps - Copy these prompts to ${toolName}:`);
+    console.log(chalk.green('✨ 文档生成完成！'));
+    console.log();
+    console.log(chalk.yellow('⚠️  重要：文档已生成，但所有类、字段、方法的描述都是空的'));
+    console.log(chalk.yellow('   这是正常的！静态扫描无法理解业务含义'));
+    console.log();
+    console.log(chalk.cyan('📋 接下来请复制以下提示词发给 AI 助手（Cursor/Claude/Qoder）：'));
     console.log(
       chalk.gray('────────────────────────────────────────────────────────────')
     );
-    console.log(PALETTE.white('1. 完善项目文档（必需）:'));
+    console.log();
+    console.log(chalk.white('请帮我完善项目文档，按以下步骤操作：'));
+    console.log();
+    console.log(chalk.gray('第 1 步：理解项目'));
+    console.log(chalk.white('  - 阅读 openspec/project.md 了解项目整体结构'));
+    console.log(chalk.white('  - 阅读 openspec/modules/*.md 了解各模块代码'));
+    console.log();
+    console.log(chalk.gray('第 2 步：补充所有描述（重点）'));
+    console.log(chalk.white('  - 查看 openspec/ai-tasks.md 了解需要补充的内容'));
+    console.log(chalk.white('  - 为所有类添加业务描述（这个类是做什么的）'));
+    console.log(chalk.white('  - 为所有字段添加业务含义（这个字段代表什么）'));
+    console.log(chalk.white('  - 为所有方法添加功能说明（这个方法做什么）'));
+    console.log(chalk.yellow('  ⚠️  不要遗漏任何一个类、字段、方法！'));
+    console.log();
+    console.log(chalk.gray('第 3 步：补充业务场景'));
+    console.log(chalk.white('  - 在每个模块文档开头的【业务场景】章节'));
+    console.log(chalk.white('  - 说明该模块解决什么业务问题、服务于哪些场景'));
+    console.log();
+    console.log(chalk.gray('第 4 步：补充核心流程'));
+    console.log(chalk.white('  - 在每个模块文档的【核心业务流程】章节'));
+    console.log(chalk.white('  - 说明关键业务逻辑的执行顺序和调用链'));
+    console.log();
+    console.log(chalk.gray('第 5 步：清理'));
+    console.log(chalk.white('  - 完成后删除 openspec/ai-tasks.md 文件'));
+    console.log();
     console.log(
-      PALETTE.lightGray(
-        '   "请按以下步骤完善项目文档：'
-      )
+      chalk.gray('────────────────────────────────────────────────────────────')
     );
-    console.log(
-      PALETTE.lightGray(
-        '   1. 阅读 openspec/project.md 主文档，理解项目结构'
-      )
-    );
-    console.log(
-      PALETTE.lightGray(
-        '   2. 依次阅读 openspec/modules/*.md 中每个模块的代码'
-      )
-    );
-    console.log(
-      PALETTE.lightGray(
-        '   3. 根据 openspec/ai-tasks.md 的指引，补充所有类、字段、方法的业务描述'
-      )
-    );
-    console.log(
-      PALETTE.lightGray(
-        '   4. 在各模块文档开头添加【业务场景】章节，说明该模块解决什么业务问题'
-      )
-    );
-    console.log(
-      PALETTE.lightGray(
-        '   5. 添加【核心业务流程】章节，说明关键业务逻辑的执行流程'
-      )
-    );
-    console.log(
-      PALETTE.lightGray(
-        '   6. 完成后删除 openspec/ai-tasks.md 文件"\n'
-      )
-    );
+    console.log();
+    console.log(chalk.cyan('💡 提示：'));
+    console.log(chalk.white('  - 你可以一次性完成所有步骤，也可以分模块逐个完成'));
+    console.log(chalk.white('  - 建议从业务最核心的模块开始'));
+    console.log(chalk.white('  - 补充描述时，请基于实际代码逻辑，不要编造'));
+    console.log();
     console.log(PALETTE.white('2. 实现新功能（文档完善后）:'));
     console.log(
       PALETTE.lightGray(
