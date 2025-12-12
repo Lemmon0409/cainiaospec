@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://github.com/Fission-AI/OpenSpec">
+  <a href="https://github.com/Lemmon0409/openspec-improve">
     <picture>
       <source srcset="assets/openspec_pixel_dark.svg" media="(prefers-color-scheme: dark)">
       <source srcset="assets/openspec_pixel_light.svg" media="(prefers-color-scheme: light)">
@@ -8,14 +8,12 @@
   </a>
   
 </p>
-<p align="center">Spec-driven development for AI coding assistants.</p>
+<p align="center">Spec-driven development for AI coding assistants - Enhanced for Java Spring Boot 🚀</p>
 <p align="center">
-  <a href="https://github.com/Fission-AI/OpenSpec/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Fission-AI/OpenSpec/actions/workflows/ci.yml/badge.svg" /></a>
-  <a href="https://www.npmjs.com/package/@fission-ai/openspec"><img alt="npm version" src="https://img.shields.io/npm/v/@fission-ai/openspec?style=flat-square" /></a>
-  <a href="https://nodejs.org/"><img alt="node version" src="https://img.shields.io/node/v/@fission-ai/openspec?style=flat-square" /></a>
+  <a href="https://github.com/Lemmon0409/openspec-improve"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-openspec--improve-blue?logo=github&style=flat-square" /></a>
+  <a href="https://github.com/Fission-AI/OpenSpec"><img alt="Based on OpenSpec v0.16.0" src="https://img.shields.io/badge/Based%20on-OpenSpec%20v0.16.0-green?style=flat-square" /></a>
+  <a href="https://nodejs.org/"><img alt="node version" src="https://img.shields.io/badge/node-%3E%3D20.19.0-brightgreen?style=flat-square" /></a>
   <a href="./LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square" /></a>
-  <a href="https://conventionalcommits.org"><img alt="Conventional Commits" src="https://img.shields.io/badge/Conventional%20Commits-1.0.0-yellow.svg?style=flat-square" /></a>
-  <a href="https://discord.gg/YctCnvvshC"><img alt="Discord" src="https://img.shields.io/badge/Discord-Join%20the%20community-5865F2?logo=discord&logoColor=white&style=flat-square" /></a>
 </p>
 
 <p align="center">
@@ -26,9 +24,71 @@
   Follow <a href="https://x.com/0xTab">@0xTab on X</a> for updates · Join the <a href="https://discord.gg/YctCnvvshC">OpenSpec Discord</a> for help and questions.
 </p>
 
-# OpenSpec
+# OpenSpec Enhanced - Java Spring Boot Edition
 
-OpenSpec aligns humans and AI coding assistants with spec-driven development so you agree on what to build before any code is written. **No API keys required.**
+> 基于 [OpenSpec v0.16.0](https://github.com/Fission-AI/OpenSpec) 的增强版本，专为 Java Spring Boot 项目优化。
+
+OpenSpec 通过规范驱动开发使人类和 AI 编码助手保持一致，在编写任何代码之前就达成共识。**无需 API 密钥。**
+
+## ✨ 增强功能亮点
+
+相比官方版本，此增强版新增：
+
+### 🎯 1. 默认启用完整实现指南
+```bash
+# 无需额外参数，一键生成完整文档
+openspec init
+```
+- ✅ 自动扫描代码生成详细文档
+- ✅ 无需 `--with-impl-guide` 参数
+- ✅ 开箱即用
+
+### ☕ 2. Java Spring Boot 全面支持
+- ✅ **Maven/Gradle 多模块项目**识别和依赖分析
+- ✅ **Interface、Enum、Public Class** 完整支持
+- ✅ **JPA 实体映射**提取 (`@Entity`, `@Table`, `@Column`, `@Index`)
+- ✅ **Spring 注解**识别 (`@RestController`, `@Service`, `@Repository`, `@Autowired`)
+- ✅ **依赖注入分析**和完整调用链推断
+- ✅ **扫描深度增加到 20 层**（原 10 层）
+
+### 📚 3. 模块化文档结构
+解决大型项目文档难以阅读的问题：
+```
+openspec/
+├── project.md          # 主文档（100-200 行索引）
+├── modules/            # 各模块详细文档
+│   ├── module1.md     # 模块 1（2,000-6,000 行）
+│   └── module2.md     # 模块 2
+└── ai-tasks.md         # AI 补全任务清单
+```
+- ✅ 主文档作为索引和概览
+- ✅ 按模块拆分详细文档
+- ✅ 避免单文件过大（从 18,719 行拆分为多个可读文件）
+
+### 🤖 4. AI 补全工作流
+- ✅ **中文化初始化提示**（6 步引导流程）
+- ✅ **业务场景占位符**（引导 AI 补充业务背景）
+- ✅ **核心业务流程占位符**（说明关键逻辑执行顺序）
+- ✅ **AI 任务清单自动生成**（列出所有需要补充的描述）
+
+### 🎯 5. 精确实现指导
+增强的 `AGENTS.md` 确保 AI 基于文档工作：
+- ✅ 要求 AI 读取项目文档理解现有代码
+- ✅ `task.md` 中明确调用链和文件路径
+- ✅ 引用具体的现有类和方法
+- ✅ **避免 AI 幻觉**，不编造不存在的代码
+
+### 📊 真实项目验证
+已在生产级项目中验证：
+- **测试项目**: starchain-astrolabe（Maven 多模块项目）
+- **扫描结果**: 278 个类完整识别
+- **生成文档**: 
+  - 主文档 122 行
+  - 3 个模块文档（平均 2,000-6,000 行/模块）
+  - AI 任务清单 212 行
+- **AI 测试**: ✅ 能基于文档生成精确实现方案，无幻觉
+
+---
 
 ## Why OpenSpec?
 
@@ -81,7 +141,92 @@ See the full comparison in [How OpenSpec Compares](#how-openspec-compares).
 4. Archive the change to merge the approved updates back into the source-of-truth specs.
 ```
 
-## Getting Started
+## 快速开始
+
+### 安装
+
+#### 从 GitHub 安装（推荐）
+
+```bash
+# 1. 克隆仓库
+git clone https://github.com/Lemmon0409/openspec-improve.git
+cd openspec-improve
+
+# 2. 切换到增强版分支
+git checkout feat/java-spring-boot-enhanced
+
+# 3. 安装依赖
+npm install
+
+# 4. 构建项目
+npm run build
+
+# 5. 全局链接
+npm link
+
+# 6. 验证安装
+openspec --version
+```
+
+### 使用
+
+#### 初始化 Java Spring Boot 项目
+```bash
+cd /path/to/your-java-project
+openspec init
+```
+
+#### 生成的文档结构
+```
+openspec/
+├── AGENTS.md           # AI 工作流指南
+├── project.md          # 主文档（项目概览和模块索引）
+├── modules/            # 模块详细文档
+│   ├── module1.md     # 模块 1 详细信息
+│   └── module2.md     # 模块 2 详细信息
+└── ai-tasks.md         # AI 补全任务清单
+```
+
+#### AI 补全流程（重要！）
+
+初始化后，将以下提示词复制给 AI：
+
+```
+请按以下步骤完善项目文档：
+
+1. 阅读 openspec/project.md 主文档，理解项目结构
+2. 依次阅读 openspec/modules/*.md 中每个模块的代码
+3. 根据 openspec/ai-tasks.md 的指引，补充所有类、字段、方法的业务描述
+4. 在各模块文档开头添加【业务场景】章节，说明该模块解决什么业务问题
+5. 添加【核心业务流程】章节，说明关键业务逻辑的执行流程
+6. 完成后删除 openspec/ai-tasks.md 文件
+```
+
+#### 创建新需求
+
+AI 补全文档后，提出需求：
+
+```
+我想实现：[描述你的需求]
+
+请基于 openspec/project.md 和 openspec/modules/*.md 生成实现方案，
+明确说明要修改的文件、调用的现有类和方法、完整的调用链。
+```
+
+### 更新
+
+获取最新版本：
+```bash
+cd openspec-improve
+git pull
+npm run build
+```
+
+---
+
+## 官方功能
+
+以下是继承自 OpenSpec v0.16.0 的核心功能：
 
 ### Supported AI Tools
 
@@ -369,6 +514,52 @@ Run `openspec update` whenever someone switches tools so your agents pick up the
    - Run `openspec update` inside each project to regenerate AI guidance and ensure the latest slash commands are active.
 
 ## Contributing
+
+欢迎贡献！
+
+- Install dependencies: `npm install`
+- Build: `npm run build`
+- Test: `npm test`
+- Develop CLI locally: `npm run dev` or `npm run dev:cli`
+- Conventional commits (one-line): `type(scope): subject`
+
+## 版本历史
+
+### v0.16.0-enhanced.1 (2024-12-12)
+
+**核心功能增强**:
+1. 默认启用完整实现指南（无需 `--with-impl-guide` 参数）
+2. 支持 Java Spring Boot 项目（Maven/Gradle 多模块、JPA、Spring 注解）
+3. 模块化文档结构（主文档 + 模块拆分）
+4. AI 补全工作流（中文引导、业务场景占位符）
+5. JavaDoc 描述提取修复
+
+**新增文件**:
+- `src/core/code-scanner.ts` - 代码扫描核心引擎
+- `src/core/framework-detector.ts` - 框架检测器
+- `src/core/templates/impl-guide-generator.ts` - 实现指南生成器
+- `GIT_SETUP.md` - Git 仓库设置指南
+- `SHARING_OPTIONS.md` - 分享方案对比
+- `README_ENHANCED.md` - 增强版功能说明
+
+**Bug 修复**:
+- ✅ 修复 JavaDoc 类描述显示 `@author` 的问题
+- ✅ 修复所有字段显示相同描述的问题
+- ✅ 修复 `@Post()` 等无参数装饰器未识别的问题
+- ✅ 增加扫描深度从 10 层到 20 层
+- ✅ 支持 Java `interface` 和 `enum`
+
+## 相关链接
+
+- **官方仓库**: https://github.com/Fission-AI/OpenSpec
+- **增强版仓库**: https://github.com/Lemmon0409/openspec-improve
+- **增强版分支**: https://github.com/Lemmon0409/openspec-improve/tree/feat/java-spring-boot-enhanced
+
+## 致谢
+
+本项目基于 [OpenSpec](https://github.com/Fission-AI/OpenSpec) v0.16.0 开发，感谢 OpenSpec 团队的开源贡献。
+
+## License
 
 - Install dependencies: `pnpm install`
 - Build: `pnpm run build`
