@@ -68,7 +68,8 @@ After deployment, create separate PR to:
 **Context Checklist:**
 - [ ] Read relevant specs in \`specs/[capability]/spec.md\`
 - [ ] Check pending changes in \`changes/\` for conflicts
-- [ ] Read \`openspec/project.md\` for conventions
+- [ ] **Read \`openspec/project.md\` for project structure and module overview**
+- [ ] **Read relevant \`openspec/modules/*.md\` to understand existing classes and APIs**
 - [ ] Run \`openspec list\` to see active changes
 - [ ] Run \`openspec list --specs\` to see existing capabilities
 
@@ -76,6 +77,8 @@ After deployment, create separate PR to:
 - Always check if capability already exists
 - Prefer modifying existing specs over creating duplicates
 - Use \`openspec show [spec]\` to review current state
+- **Based on project documentation, identify which module the feature belongs to**
+- **Check existing classes in the target module to avoid duplication**
 - If request is ambiguous, ask 1–2 clarifying questions before scaffolding
 
 ### Search Guidance
@@ -100,6 +103,9 @@ openspec archive <change-id> [--yes|-y]   # Archive after deployment (add --yes 
 
 # Project management
 openspec init [path]           # Initialize OpenSpec
+openspec init --with-impl-guide  # Initialize with implementation guidance
+openspec init --scan-code --with-impl-guide  # Scan code and generate guidance
+openspec init --frameworks nestjs,typeorm  # Specify frameworks explicitly
 openspec update [path]         # Update instruction files
 
 # Interactive mode
@@ -174,6 +180,15 @@ New request?
 - Affected code: [key files/systems]
 \`\`\`
 
+**Important:** When writing proposal.md for code changes:
+- **MUST** include a "File Change Manifest" section with:
+  - New Files: table with [File Path, Purpose, Dependencies]
+  - Modified Files: table with [File Path, Changes, Reason]
+  - Deleted Files: table with [File Path, Reason]
+- **MUST** use specific file paths (e.g., \`src/core/code-scanner.ts\`), not placeholders
+- **SHOULD** include implementation step mapping: which files to change in which order
+- **SHOULD** include code example snippets showing key patterns (decorators, interfaces, etc.)
+
 3. **Create spec deltas:** \`specs/[capability]/spec.md\`
 \`\`\`markdown
 ## ADDED Requirements
@@ -195,14 +210,123 @@ The system SHALL provide...
 \`\`\`
 If multiple capabilities are affected, create multiple delta files under \`changes/[change-id]/specs/<capability>/spec.md\`—one per capability.
 
+**Important:** When creating spec deltas with implementation changes:
+- **SHOULD** include implementation guidance section if project.md contains implementation mapping
+- **SHOULD** reference specific files that implement each requirement (e.g., \`Implemented in: src/services/auth.service.ts\`)
+- **SHOULD** include code examples showing decorators, class structure, or framework patterns
+- **SHOULD** map requirements to actual code locations to prevent AI hallucinations
+
 4. **Create tasks.md:**
 \`\`\`markdown
 ## 1. Implementation
 - [ ] 1.1 Create database schema
+  - File: \`src/entities/user.entity.ts\`
+  - Class: \`User\` (extends BaseEntity)
+  - Content: Define user entity with TypeORM decorators
+  - Verification: Run \`pnpm typeorm migration:generate\`
+
 - [ ] 1.2 Implement API endpoint
-- [ ] 1.3 Add frontend component
+  - File: \`src/controllers/user.controller.ts\`
+  - Class: \`UserController\`
+  - Method: \`create()\` - POST /users
+  - API: \`POST /api/users\` -> \`UserService.createUser()\`
+  - Dependencies: Task 1.1 (entity must exist first)
+  - Verification: \`curl -X POST http://localhost:3000/api/users\`
+
+- [ ] 1.3 Implement business logic
+  - File: \`src/services/user.service.ts\`
+  - Class: \`UserService\`
+  - Method: \`createUser(dto: CreateUserDto): Promise<User>\`
+  - Uses: \`UserRepository.save()\`, \`EmailService.sendWelcome()\`
+  - Verification: Unit test \`test/services/user.service.test.ts\`
+
 - [ ] 1.4 Write tests
+  - File: \`test/controllers/user.controller.test.ts\`
+  - Tests: \`UserController.create()\` scenarios
+  - Verification: \`pnpm test:unit\`
 \`\`\`
+
+**Task Documentation Format (Required):**
+
+Each task MUST include:
+\`\`\`markdown
+- [ ] [Task ID] [Task Description]
+  - File: \`[absolute path to file]\`
+  - Class: \`[ClassName]\` (if applicable)
+  - Method: \`[methodName(params): ReturnType]\` (if applicable)
+  - API: \`[HTTP_METHOD] [path]\` -> \`[ServiceClass.method()]\` (for API tasks)
+  - Uses: \`[list of classes/methods this task calls]\`
+  - Dependencies: [List prerequisite task IDs]
+  - Content: [Brief description of implementation]
+  - Verification: [Specific command or test to verify completion]
+\`\`\`
+
+**Task Categories and Templates:**
+
+*Entity/Model Tasks:*
+\`\`\`markdown
+- [ ] 1.1 Create User entity
+  - File: \`src/entities/user.entity.ts\`
+  - Class: \`User\` (@Entity decorator)
+  - Fields: id (uuid), email (string), createdAt (Date)
+  - Relations: @OneToMany(() => Post, post => post.author)
+  - Verification: TypeORM can load the entity
+\`\`\`
+
+*API/Controller Tasks:*
+\`\`\`markdown
+- [ ] 2.1 Create user registration endpoint
+  - File: \`src/controllers/user.controller.ts\`
+  - Class: \`UserController\`
+  - Method: \`register(dto: CreateUserDto): Promise<UserResponse>\`
+  - API: \`POST /api/users/register\`
+  - Request Body: \`CreateUserDto\` { email, password, name }
+  - Response: \`UserResponse\` { id, email, name }
+  - Status Codes: 201 (created), 400 (validation), 409 (duplicate)
+  - Verification: Integration test with valid/invalid payloads
+\`\`\`
+
+*Service/Business Logic Tasks:*
+\`\`\`markdown
+- [ ] 3.1 Implement user creation logic
+  - File: \`src/services/user.service.ts\`
+  - Class: \`UserService\`
+  - Method: \`createUser(dto: CreateUserDto): Promise<User>\`
+  - Business Rules:
+    - Validate email uniqueness
+    - Hash password before saving
+    - Send welcome email after creation
+  - Uses: \`UserRepository\`, \`PasswordService.hash()\`, \`EmailService.sendWelcome()\`
+  - Verification: Unit test with mocked dependencies
+\`\`\`
+
+*Integration Tasks:*
+\`\`\`markdown
+- [ ] 4.1 Wire up user module
+  - File: \`src/modules/user.module.ts\`
+  - Imports: TypeOrmModule.forFeature([User])
+  - Providers: [UserService, UserRepository]
+  - Controllers: [UserController]
+  - Exports: [UserService]
+  - Verification: Module compiles without errors
+\`\`\`
+
+**Important:** When creating tasks.md for code changes:
+- **MUST** base on \`openspec/project.md\` and \`openspec/modules/*.md\` to understand existing code structure
+- **MUST** include specific file paths for each task (e.g., \`src/services/user.service.ts\`)
+- **MUST** reference concrete code locations (e.g., \`UserController.create() in src/controllers/user.controller.ts\`)
+- **MUST** specify which files to create, modify, or delete
+- **MUST** list which existing classes/services will be called (e.g., "Uses: \`UserRepository.findByEmail()\`, \`PasswordService.hash()\`")
+- **MUST** include API endpoint details for controller tasks (HTTP method, path, request/response types)
+- **MUST** list business rules for service tasks
+- **MUST** specify the call chain (e.g., "Controller → Service → Manager → DAO")
+- **MUST** specify verification method for each task
+- **AVOID** generic placeholders like \`[module-name].ts\` or \`[service-file]\`
+- **SHOULD** include file change manifest: New Files, Modified Files, Deleted Files
+- **SHOULD** include code snippets showing decorators, class structures, or patterns to follow
+- **SHOULD** reference similar existing implementations from project docs as examples
+- **SHOULD** declare dependencies between tasks when order matters
+- **SHOULD** list "Uses:" section showing which classes/methods the task will call
 
 5. **Create design.md when needed:**
 Create \`design.md\` if any of the following apply; otherwise omit it:

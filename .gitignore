@@ -150,3 +150,9 @@ CLAUDE.md
 
 # Pnpm
 .pnpm-store/
+
+# Git作者切换规则文件（AI代码统计插件自动添加）
+.cursor/rules/git-author-switch.mdc
+
+# Claude配置文件（AI代码统计插件自动添加）
+.claude/settings.local.json

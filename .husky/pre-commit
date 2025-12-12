@@ -1,0 +1,12 @@
+#!/usr/bin/env sh
+
+# AI Code Stats - 自动切换为人工作者
+GLOBAL_AUTHOR=$(git config --global user.name)
+if [ -n "$GLOBAL_AUTHOR" ]; then
+  # 去掉 ai- 前缀（如果存在）
+  MANUAL_AUTHOR=${GLOBAL_AUTHOR#ai-}
+  git config user.name "$MANUAL_AUTHOR"
+fi
+
+# AI Code Stats - 记录统计信息
+echo "RECORD_STATS" > .git/ai-code-stats-trigger.tmp

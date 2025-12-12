@@ -246,6 +246,9 @@ export class ArchiveCommand {
       }
     }
 
+    // Generate implementation summary before archiving
+    await this.generateImplementationSummary(changeDir, changeName!);
+
     // Create archive directory if needed
     await fs.mkdir(archiveDir, { recursive: true });
 
@@ -596,11 +599,461 @@ export class ArchiveCommand {
 
   private buildSpecSkeleton(specFolderName: string, changeName: string): string {
     const titleBase = specFolderName;
-    return `# ${titleBase} Specification\n\n## Purpose\nTBD - created by archiving change ${changeName}. Update Purpose after archive.\n\n## Requirements\n`;
+    return `# ${titleBase} Specification
+
+## Purpose
+TBD - created by archiving change ${changeName}. Update Purpose after archive.
+
+## Requirements
+`;
   }
 
   private getArchiveDate(): string {
     // Returns date in YYYY-MM-DD format
     return new Date().toISOString().split('T')[0];
   }
+
+  /**
+   * Generate an implementation summary document before archiving
+   * This document contains detailed information about what was implemented,
+   * including APIs, classes, and business logic changes.
+   */
+  private async generateImplementationSummary(changeDir: string, changeName: string): Promise<void> {
+    const summaryPath = path.join(changeDir, 'implementation-summary.md');
+    
+    // Read proposal.md if exists
+    let proposalContent = '';
+    try {
+      proposalContent = await fs.readFile(path.join(changeDir, 'proposal.md'), 'utf-8');
+    } catch {
+      // No proposal.md
+    }
+
+    // Read tasks.md if exists
+    let tasksContent = '';
+    try {
+      tasksContent = await fs.readFile(path.join(changeDir, 'tasks.md'), 'utf-8');
+    } catch {
+      // No tasks.md
+    }
+
+    // Parse tasks to extract implementation details
+    const taskAnalysis = this.analyzeTasksContent(tasksContent);
+    const proposalAnalysis = this.analyzeProposalContent(proposalContent);
+
+    // Read delta specs to understand what requirements were added/modified
+    const deltaSpecs = await this.collectDeltaSpecs(changeDir);
+
+    // Generate the summary
+    const summary = this.buildImplementationSummary(
+      changeName,
+      proposalAnalysis,
+      taskAnalysis,
+      deltaSpecs
+    );
+
+    // Write the summary
+    await fs.writeFile(summaryPath, summary);
+    console.log(`Generated implementation summary: implementation-summary.md`);
+  }
+
+  private analyzeTasksContent(tasksContent: string): TaskAnalysis {
+    const analysis: TaskAnalysis = {
+      totalTasks: 0,
+      completedTasks: 0,
+      files: {
+        created: [],
+        modified: [],
+        deleted: [],
+      },
+      apis: [],
+      classes: [],
+      businessLogic: [],
+    };
+
+    if (!tasksContent) return analysis;
+
+    const lines = tasksContent.split('\n');
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      
+      // Count tasks
+      if (line.match(/^\s*-\s*\[[ x]\]/)) {
+        analysis.totalTasks++;
+        if (line.includes('[x]')) {
+          analysis.completedTasks++;
+        }
+      }
+
+      // Extract file paths
+      const fileMatch = line.match(/File:\s*`([^`]+)`/);
+      if (fileMatch) {
+        const filePath = fileMatch[1];
+        // Determine if create/modify based on context
+        const prevLine = i > 0 ? lines[i - 1] : '';
+        if (prevLine.toLowerCase().includes('create') || prevLine.toLowerCase().includes('add')) {
+          if (!analysis.files.created.includes(filePath)) {
+            analysis.files.created.push(filePath);
+          }
+        } else if (prevLine.toLowerCase().includes('delete') || prevLine.toLowerCase().includes('remove')) {
+          if (!analysis.files.deleted.includes(filePath)) {
+            analysis.files.deleted.push(filePath);
+          }
+        } else {
+          if (!analysis.files.modified.includes(filePath) && !analysis.files.created.includes(filePath)) {
+            analysis.files.modified.push(filePath);
+          }
+        }
+      }
+
+      // Extract API endpoints
+      const apiMatch = line.match(/API:\s*`([^`]+)`\s*->\s*`([^`]+)`/);
+      if (apiMatch) {
+        analysis.apis.push({
+          endpoint: apiMatch[1],
+          handler: apiMatch[2],
+        });
+      }
+
+      // Alternative API format: HTTP method + path
+      const httpMatch = line.match(/`(GET|POST|PUT|DELETE|PATCH)\s+([^`]+)`/);
+      if (httpMatch && !apiMatch) {
+        analysis.apis.push({
+          endpoint: `${httpMatch[1]} ${httpMatch[2]}`,
+          handler: '',
+        });
+      }
+
+      // Extract class references
+      const classMatch = line.match(/Class:\s*`([^`]+)`/);
+      if (classMatch) {
+        const className = classMatch[1];
+        if (!analysis.classes.some(c => c.name === className)) {
+          analysis.classes.push({
+            name: className,
+            file: '',
+          });
+        }
+      }
+
+      // Extract method references
+      const methodMatch = line.match(/Method:\s*`([^`]+)`/);
+      if (methodMatch) {
+        analysis.businessLogic.push(methodMatch[1]);
+      }
+
+      // Extract business rules
+      if (line.includes('Business Rules:')) {
+        // Collect subsequent indented lines as business rules
+        for (let j = i + 1; j < lines.length; j++) {
+          const ruleLine = lines[j];
+          if (ruleLine.match(/^\s+-\s+/)) {
+            const rule = ruleLine.replace(/^\s+-\s+/, '').trim();
+            if (rule) {
+              analysis.businessLogic.push(rule);
+            }
+          } else if (!ruleLine.match(/^\s+/)) {
+            break;
+          }
+        }
+      }
+    }
+
+    return analysis;
+  }
+
+  private analyzeProposalContent(proposalContent: string): ProposalAnalysis {
+    const analysis: ProposalAnalysis = {
+      title: '',
+      why: '',
+      whatChanges: [],
+      affectedSpecs: [],
+      affectedCode: [],
+    };
+
+    if (!proposalContent) return analysis;
+
+    // Extract title
+    const titleMatch = proposalContent.match(/^#\s+(.+)$/m);
+    if (titleMatch) {
+      analysis.title = titleMatch[1].replace(/^Change:\s*/i, '').trim();
+    }
+
+    // Extract why section
+    const whyMatch = proposalContent.match(/##\s+Why[\s\S]*?(?=##|$)/i);
+    if (whyMatch) {
+      analysis.why = whyMatch[0].replace(/##\s+Why\s*/i, '').trim().split('\n')[0];
+    }
+
+    // Extract what changes
+    const whatMatch = proposalContent.match(/##\s+What Changes[\s\S]*?(?=##|$)/i);
+    if (whatMatch) {
+      const lines = whatMatch[0].split('\n');
+      for (const line of lines) {
+        if (line.match(/^\s*-\s+/)) {
+          analysis.whatChanges.push(line.replace(/^\s*-\s+/, '').trim());
+        }
+      }
+    }
+
+    // Extract affected specs
+    const specMatches = proposalContent.matchAll(/specs\/([\w-]+)/g);
+    for (const match of specMatches) {
+      if (!analysis.affectedSpecs.includes(match[1])) {
+        analysis.affectedSpecs.push(match[1]);
+      }
+    }
+
+    // Extract affected code paths
+    const codeMatches = proposalContent.matchAll(/`(src\/[^`]+)`/g);
+    for (const match of codeMatches) {
+      if (!analysis.affectedCode.includes(match[1])) {
+        analysis.affectedCode.push(match[1]);
+      }
+    }
+
+    return analysis;
+  }
+
+  private async collectDeltaSpecs(changeDir: string): Promise<DeltaSpecSummary[]> {
+    const summaries: DeltaSpecSummary[] = [];
+    const specsDir = path.join(changeDir, 'specs');
+
+    try {
+      const entries = await fs.readdir(specsDir, { withFileTypes: true });
+      
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        
+        const specPath = path.join(specsDir, entry.name, 'spec.md');
+        try {
+          const content = await fs.readFile(specPath, 'utf-8');
+          const delta = parseDeltaSpec(content);
+          
+          summaries.push({
+            capability: entry.name,
+            added: delta.added.map(r => r.name),
+            modified: delta.modified.map(r => r.name),
+            removed: delta.removed,
+            renamed: delta.renamed.map(r => `${r.from} -> ${r.to}`),
+          });
+        } catch {
+          // Skip if can't read
+        }
+      }
+    } catch {
+      // No specs directory
+    }
+
+    return summaries;
+  }
+
+  private buildImplementationSummary(
+    changeName: string,
+    proposal: ProposalAnalysis,
+    tasks: TaskAnalysis,
+    deltas: DeltaSpecSummary[]
+  ): string {
+    const sections: string[] = [];
+    const archiveDate = this.getArchiveDate();
+
+    // Header
+    sections.push(`# Implementation Summary: ${changeName}`);
+    sections.push('');
+    sections.push(`**Archived:** ${archiveDate}`);
+    sections.push(`**Tasks Completed:** ${tasks.completedTasks}/${tasks.totalTasks}`);
+    sections.push('');
+
+    // Overview from proposal
+    if (proposal.title) {
+      sections.push(`## Overview`);
+      sections.push('');
+      sections.push(`**Change:** ${proposal.title}`);
+      if (proposal.why) {
+        sections.push(`**Reason:** ${proposal.why}`);
+      }
+      sections.push('');
+    }
+
+    // What Changed
+    if (proposal.whatChanges.length > 0) {
+      sections.push(`## What Changed`);
+      sections.push('');
+      for (const change of proposal.whatChanges) {
+        sections.push(`- ${change}`);
+      }
+      sections.push('');
+    }
+
+    // Files Changed
+    if (tasks.files.created.length > 0 || tasks.files.modified.length > 0 || tasks.files.deleted.length > 0) {
+      sections.push(`## Files Changed`);
+      sections.push('');
+      
+      if (tasks.files.created.length > 0) {
+        sections.push(`### New Files`);
+        sections.push('');
+        sections.push(`| File Path | Type |`);
+        sections.push(`|-----------|------|`);
+        for (const file of tasks.files.created) {
+          const type = this.inferFileType(file);
+          sections.push(`| \`${file}\` | ${type} |`);
+        }
+        sections.push('');
+      }
+
+      if (tasks.files.modified.length > 0) {
+        sections.push(`### Modified Files`);
+        sections.push('');
+        for (const file of tasks.files.modified) {
+          sections.push(`- \`${file}\``);
+        }
+        sections.push('');
+      }
+
+      if (tasks.files.deleted.length > 0) {
+        sections.push(`### Deleted Files`);
+        sections.push('');
+        for (const file of tasks.files.deleted) {
+          sections.push(`- \`${file}\``);
+        }
+        sections.push('');
+      }
+    }
+
+    // API Changes
+    if (tasks.apis.length > 0) {
+      sections.push(`## API Endpoints Added/Modified`);
+      sections.push('');
+      sections.push(`| Endpoint | Handler |`);
+      sections.push(`|----------|---------|`);
+      for (const api of tasks.apis) {
+        sections.push(`| \`${api.endpoint}\` | ${api.handler ? `\`${api.handler}\`` : '-'} |`);
+      }
+      sections.push('');
+    }
+
+    // Classes Added/Modified
+    if (tasks.classes.length > 0) {
+      sections.push(`## Classes Implemented`);
+      sections.push('');
+      for (const cls of tasks.classes) {
+        sections.push(`- \`${cls.name}\`${cls.file ? ` in \`${cls.file}\`` : ''}`);
+      }
+      sections.push('');
+    }
+
+    // Business Logic
+    if (tasks.businessLogic.length > 0) {
+      sections.push(`## Business Logic`);
+      sections.push('');
+      for (const logic of tasks.businessLogic) {
+        sections.push(`- ${logic}`);
+      }
+      sections.push('');
+    }
+
+    // Spec Changes
+    if (deltas.length > 0) {
+      sections.push(`## Specification Changes`);
+      sections.push('');
+      
+      for (const delta of deltas) {
+        sections.push(`### ${delta.capability}`);
+        sections.push('');
+        
+        if (delta.added.length > 0) {
+          sections.push(`**Added Requirements:**`);
+          for (const req of delta.added) {
+            sections.push(`- ${req}`);
+          }
+          sections.push('');
+        }
+
+        if (delta.modified.length > 0) {
+          sections.push(`**Modified Requirements:**`);
+          for (const req of delta.modified) {
+            sections.push(`- ${req}`);
+          }
+          sections.push('');
+        }
+
+        if (delta.removed.length > 0) {
+          sections.push(`**Removed Requirements:**`);
+          for (const req of delta.removed) {
+            sections.push(`- ${req}`);
+          }
+          sections.push('');
+        }
+
+        if (delta.renamed.length > 0) {
+          sections.push(`**Renamed Requirements:**`);
+          for (const req of delta.renamed) {
+            sections.push(`- ${req}`);
+          }
+          sections.push('');
+        }
+      }
+    }
+
+    // Related Documentation
+    sections.push(`## Related Documentation`);
+    sections.push('');
+    sections.push(`- [Proposal](./proposal.md)`);
+    sections.push(`- [Tasks](./tasks.md)`);
+    if (deltas.length > 0) {
+      sections.push(`- Spec Deltas:`);
+      for (const delta of deltas) {
+        sections.push(`  - [${delta.capability}](./specs/${delta.capability}/spec.md)`);
+      }
+    }
+    sections.push('');
+
+    return sections.join('\n');
+  }
+
+  private inferFileType(filePath: string): string {
+    if (filePath.includes('.entity.') || filePath.includes('.model.')) return 'Entity';
+    if (filePath.includes('.controller.')) return 'Controller';
+    if (filePath.includes('.service.')) return 'Service';
+    if (filePath.includes('.repository.')) return 'Repository';
+    if (filePath.includes('.dto.')) return 'DTO';
+    if (filePath.includes('.test.') || filePath.includes('.spec.')) return 'Test';
+    if (filePath.includes('.middleware.')) return 'Middleware';
+    if (filePath.includes('.guard.')) return 'Guard';
+    if (filePath.includes('.module.')) return 'Module';
+    if (filePath.includes('.config.')) return 'Config';
+    return 'Other';
+  }
+}
+
+// Type definitions for archive analysis
+interface TaskAnalysis {
+  totalTasks: number;
+  completedTasks: number;
+  files: {
+    created: string[];
+    modified: string[];
+    deleted: string[];
+  };
+  apis: Array<{ endpoint: string; handler: string }>;
+  classes: Array<{ name: string; file: string }>;
+  businessLogic: string[];
+}
+
+interface ProposalAnalysis {
+  title: string;
+  why: string;
+  whatChanges: string[];
+  affectedSpecs: string[];
+  affectedCode: string[];
+}
+
+interface DeltaSpecSummary {
+  capability: string;
+  added: string[];
+  modified: string[];
+  removed: string[];
+  renamed: string[];
 }

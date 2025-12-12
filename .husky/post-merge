@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+
+# AI Code Stats - merge后清除缓存
+echo "CLEAR_CACHE_ON_MERGE_$(date +%s)" > .git/ai-code-stats-merge.tmp

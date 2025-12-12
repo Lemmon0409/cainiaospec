@@ -44,7 +44,7 @@
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
-    "prepare": "pnpm run build",
+    "prepare": "npm run build",
     "prepublishOnly": "pnpm run build",
     "check:pack-version": "node scripts/pack-version-check.mjs",
     "release": "pnpm run release:ci",
@@ -59,6 +59,7 @@
     "@changesets/cli": "^2.27.7",
     "@types/node": "^24.2.0",
     "@vitest/ui": "^3.2.4",
+    "husky": "^9.1.7",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"
   },

@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+
+# AI Code Stats - 重置统计
+echo "RESET_STATS_$(date +%s)" > .git/ai-code-stats-reset.tmp

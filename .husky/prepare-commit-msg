@@ -1,0 +1,66 @@
+#!/usr/bin/env sh
+# AI Code Stats - 生成提交统计信息
+
+COMMIT_MSG_FILE=$1
+COMMIT_SOURCE=$2
+
+# 只在交互式提交时添加信息（不影响 merge、rebase 等）
+if [ -z "$COMMIT_SOURCE" ] || [ "$COMMIT_SOURCE" = "message" ]; then
+    
+    # 触发VSCode插件生成AI代码统计信息
+    echo "GENERATE_COMMIT_STATS" > .git/ai-code-stats-generate.tmp
+    
+    # 等待插件处理，增加等待时间
+    sleep 2.0
+    
+    # 检查是否生成了统计信息文件
+    if [ -f .git/ai-code-stats-commit.tmp ]; then
+        STATS_INFO=$(cat .git/ai-code-stats-commit.tmp)
+        
+        # 验证统计信息是否有效且不为空
+        if [ -n "$STATS_INFO" ] && [ "$STATS_INFO" != "" ]; then
+            # 备份原始文件
+            cp "$COMMIT_MSG_FILE" "$COMMIT_MSG_FILE.bak" 2>/dev/null || true
+            
+            # 保存原始commit消息，过滤空行和注释
+            ORIGINAL_MSG=$(cat "$COMMIT_MSG_FILE" | grep -v '^[[:space:]]*$' | grep -v '^#' | head -1)
+            
+            # 如果原始消息为空，使用默认消息
+            if [ -z "$ORIGINAL_MSG" ]; then
+                ORIGINAL_MSG="代码更新"
+            fi
+            
+            # 重构commit消息格式：用户消息 - AI生码信息
+            echo "$ORIGINAL_MSG - $STATS_INFO" > "$COMMIT_MSG_FILE"
+            
+            # 保留原有的注释行
+            cat "$COMMIT_MSG_FILE.bak" 2>/dev/null | grep '^#' >> "$COMMIT_MSG_FILE" || true
+            
+            # 清理备份文件
+            rm -f "$COMMIT_MSG_FILE.bak"
+        fi
+        
+        # 清理临时文件
+        rm -f .git/ai-code-stats-commit.tmp
+    else
+        # 如果没有生成统计文件，再次尝试触发
+        echo "GENERATE_COMMIT_STATS_RETRY" > .git/ai-code-stats-generate-retry.tmp
+        sleep 0.5
+        
+        # 再次尝试读取
+        if [ -f .git/ai-code-stats-commit.tmp ]; then
+            STATS_INFO=$(cat .git/ai-code-stats-commit.tmp)
+            if [ -n "$STATS_INFO" ] && [ "$STATS_INFO" != "" ]; then
+                ORIGINAL_MSG=$(cat "$COMMIT_MSG_FILE" | grep -v '^[[:space:]]*$' | grep -v '^#' | head -1)
+                if [ -z "$ORIGINAL_MSG" ]; then
+                    ORIGINAL_MSG="代码更新"
+                fi
+                echo "$ORIGINAL_MSG - $STATS_INFO" > "$COMMIT_MSG_FILE"
+            fi
+            rm -f .git/ai-code-stats-commit.tmp
+        fi
+    fi
+    
+    # 清理触发文件
+    rm -f .git/ai-code-stats-generate.tmp
+fi

@@ -41,7 +41,15 @@ program
   .command('init [path]')
   .description('Initialize OpenSpec in your project')
   .option('--tools <tools>', toolsOptionDescription)
-  .action(async (targetPath = '.', options?: { tools?: string }) => {
+  .option('-g, --with-impl-guide', 'Generate specs with implementation guidance')
+  .option('-s, --scan-code', 'Scan existing code to extract implementation details')
+  .option('-f, --frameworks <frameworks>', 'Specify frameworks (comma-separated: nestjs,typeorm,express,prisma)')
+  .action(async (targetPath = '.', options?: { 
+    tools?: string; 
+    withImplGuide?: boolean;
+    scanCode?: boolean;
+    frameworks?: string;
+  }) => {
     try {
       // Validate that the path is a valid directory
       const resolvedPath = path.resolve(targetPath);
@@ -64,6 +72,9 @@ program
       
       const initCommand = new InitCommand({
         tools: options?.tools,
+        withImplGuide: options?.withImplGuide,
+        scanCode: options?.scanCode,
+        frameworks: options?.frameworks,
       });
       await initCommand.execute(targetPath);
     } catch (error) {

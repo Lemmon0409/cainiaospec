@@ -371,15 +371,24 @@ const toolSelectionWizard = createPrompt<string[], ToolWizardConfig>(
 type InitCommandOptions = {
   prompt?: ToolSelectionPrompt;
   tools?: string;
+  withImplGuide?: boolean;
+  scanCode?: boolean;
+  frameworks?: string;
 };
 
 export class InitCommand {
   private readonly prompt: ToolSelectionPrompt;
   private readonly toolsArg?: string;
+  private readonly withImplGuide: boolean;
+  private readonly scanCode: boolean;
+  private readonly frameworksArg?: string;
 
   constructor(options: InitCommandOptions = {}) {
     this.prompt = options.prompt ?? ((config) => toolSelectionWizard(config));
     this.toolsArg = options.tools;
+    this.withImplGuide = options.withImplGuide ?? true; // Default to true
+    this.scanCode = options.scanCode ?? true;
+    this.frameworksArg = options.frameworks;
   }
 
   async execute(targetPath: string): Promise<void> {
@@ -737,9 +746,9 @@ export class InitCommand {
     config: OpenSpecConfig,
     skipExisting: boolean
   ): Promise<void> {
-    const context: ProjectContext = {
-      // Could be enhanced with prompts for project details
-    };
+    const context: ProjectContext = await this.buildProjectContext(
+      path.dirname(openspecPath)
+    );
 
     const templates = TemplateManager.getTemplates(context);
 
@@ -758,6 +767,55 @@ export class InitCommand {
 
       await FileSystemUtils.writeFile(filePath, content);
     }
+  }
+
+  private async buildProjectContext(
+    projectPath: string
+  ): Promise<ProjectContext> {
+    const context: ProjectContext = {
+      withImplGuide: this.withImplGuide,
+    };
+
+    if (!this.withImplGuide) {
+      return context;
+    }
+
+    // Import framework detector and code scanner
+    const { detectFrameworks } = await import('./framework-detector.js');
+    const { scanCodebase } = await import('./code-scanner.js');
+
+    // Detect frameworks
+    const frameworkResult = detectFrameworks(projectPath);
+    context.frameworks = this.frameworksArg
+      ? this.frameworksArg.split(',').map(f => f.trim())
+      : frameworkResult.frameworks;
+
+    // Scan code if requested
+    if (this.scanCode) {
+      const scanResult = await scanCodebase({
+        rootDir: projectPath,
+        excludePatterns: [
+          '**/node_modules/**',
+          '**/dist/**',
+          '**/build/**',
+          '**/.git/**',
+          '**/coverage/**',
+          '**/openspec/**',
+        ],
+      });
+
+      context.directoryStructure = scanResult.directoryStructure;
+      // Enhanced: Pass all scanned information to template
+            context.allClasses = scanResult.allClasses;
+      context.apiDocumentation = scanResult.apiDocumentation;
+      context.businessLogic = scanResult.businessLogic;
+      context.codeStylePatterns = scanResult.codeStylePatterns;
+      // Enhanced: Pass project structure and dependencies
+      context.projectStructure = scanResult.projectStructure;
+      context.classDependencies = scanResult.classDependencies;
+    }
+
+    return context;
   }
 
   private async configureAITools(
@@ -886,34 +944,71 @@ export class InitCommand {
     console.log(
       chalk.gray('────────────────────────────────────────────────────────────')
     );
-    console.log(PALETTE.white('1. Populate your project context:'));
+    console.log(PALETTE.white('1. 完善项目文档（必需）:'));
     console.log(
       PALETTE.lightGray(
-        '   "Please read openspec/project.md and help me fill it out'
+        '   "请按以下步骤完善项目文档：'
       )
     );
     console.log(
       PALETTE.lightGray(
-        '    with details about my project, tech stack, and conventions"\n'
+        '   1. 阅读 openspec/project.md 主文档，理解项目结构'
       )
     );
-    console.log(PALETTE.white('2. Create your first change proposal:'));
     console.log(
       PALETTE.lightGray(
-        '   "I want to add [YOUR FEATURE HERE]. Please create an'
+        '   2. 依次阅读 openspec/modules/*.md 中每个模块的代码'
       )
     );
-    console.log(
-      PALETTE.lightGray('    OpenSpec change proposal for this feature"\n')
-    );
-    console.log(PALETTE.white('3. Learn the OpenSpec workflow:'));
     console.log(
       PALETTE.lightGray(
-        '   "Please explain the OpenSpec workflow from openspec/AGENTS.md'
+        '   3. 根据 openspec/ai-tasks.md 的指引，补充所有类、字段、方法的业务描述'
       )
     );
     console.log(
-      PALETTE.lightGray('    and how I should work with you on this project"')
+      PALETTE.lightGray(
+        '   4. 在各模块文档开头添加【业务场景】章节，说明该模块解决什么业务问题'
+      )
+    );
+    console.log(
+      PALETTE.lightGray(
+        '   5. 添加【核心业务流程】章节，说明关键业务逻辑的执行流程'
+      )
+    );
+    console.log(
+      PALETTE.lightGray(
+        '   6. 完成后删除 openspec/ai-tasks.md 文件"\n'
+      )
+    );
+    console.log(PALETTE.white('2. 实现新功能（文档完善后）:'));
+    console.log(
+      PALETTE.lightGray(
+        '   "我想实现 [具体功能描述]。'
+      )
+    );
+    console.log(
+      PALETTE.lightGray(
+        '   请基于 openspec/project.md 和模块文档理解项目结构，'
+      )
+    );
+    console.log(
+      PALETTE.lightGray(
+        '   创建详细的 OpenSpec 变更提案，'
+      )
+    );
+    console.log(
+      PALETTE.lightGray(
+        '   说明需要修改哪些文件、调用哪些类、具体实现逻辑"\n'
+      )
+    );
+    console.log(PALETTE.white('3. 了解 OpenSpec 工作流:'));
+    console.log(
+      PALETTE.lightGray(
+        '   "请解释 openspec/AGENTS.md 中的工作流程，'
+      )
+    );
+    console.log(
+      PALETTE.lightGray('    以及如何在这个项目中协作"')
     );
     console.log(
       PALETTE.darkGray(
