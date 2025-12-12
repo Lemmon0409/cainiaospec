@@ -7,10 +7,12 @@ Instructions for AI coding assistants using OpenSpec for spec-driven development
 - Search existing work: \`openspec spec list --long\`, \`openspec list\` (use \`rg\` only for full-text search)
 - Decide scope: new capability vs modify existing capability
 - Pick a unique \`change-id\`: kebab-case, verb-led (\`add-\`, \`update-\`, \`remove-\`, \`refactor-\`)
-- Scaffold: \`proposal.md\`, \`tasks.md\`, \`design.md\` (only if needed), and delta specs per affected capability
+- **MUST create ALL files**: \`proposal.md\`, \`tasks.md\`, \`design.md\` (only if needed), and delta specs per affected capability
 - Write deltas: use \`## ADDED|MODIFIED|REMOVED|RENAMED Requirements\`; include at least one \`#### Scenario:\` per requirement
 - Validate: \`openspec validate [change-id] --strict\` and fix issues
 - Request approval: Do not start implementation until proposal is approved
+
+**⚠️  CRITICAL: You MUST create both proposal.md AND tasks.md for every change. Creating only one file is incomplete!**
 
 ## Three-Stage Workflow
 
@@ -42,19 +44,100 @@ Skip proposal for:
 
 **Workflow**
 1. Review \`openspec/project.md\`, \`openspec list\`, and \`openspec list --specs\` to understand current context.
-2. Choose a unique verb-led \`change-id\` and scaffold \`proposal.md\`, \`tasks.md\`, optional \`design.md\`, and spec deltas under \`openspec/changes/<id>/\`.
-3. Draft spec deltas using \`## ADDED|MODIFIED|REMOVED Requirements\` with at least one \`#### Scenario:\` per requirement.
-4. Run \`openspec validate <id> --strict\` and resolve any issues before sharing the proposal.
+2. Choose a unique verb-led \`change-id\` and create directory: \`openspec/changes/<id>/\`
+3. **MUST create these files** (in order):
+   - \`proposal.md\` - The "what" and "why"
+   - \`tasks.md\` - The "how" (step-by-step implementation)
+   - \`design.md\` (optional) - Technical decisions if needed
+   - \`specs/\` - Delta specs if affecting capabilities
+4. Draft spec deltas using \`## ADDED|MODIFIED|REMOVED Requirements\` with at least one \`#### Scenario:\` per requirement.
+5. Run \`openspec validate <id> --strict\` and resolve any issues before sharing the proposal.
+
+**⚠️  Common Mistake: DO NOT create only proposal.md and stop. You MUST also create tasks.md in the same change!**
 
 ### Stage 2: Implementing Changes
-Track these steps as TODOs and complete them one by one.
+
+**⚠️  BEFORE WRITING ANY CODE: Complete Pre-Implementation Checklist**
+
+For EVERY task, you MUST:
+1. ✅ Open and read proposal.md completely
+2. ✅ Locate the relevant section in proposal.md (API Specification, Implementation Logic, Call Chain)
+3. ✅ Copy the exact specifications from proposal.md:
+   - API endpoints (method + path)
+   - Request/response structures (all fields with types)
+   - Business logic steps (numbered list)
+   - Call chain (method call order)
+4. ✅ Verify tasks.md matches proposal.md
+5. ✅ Only then start coding
+
+**Implementation Workflow:**
 1. **Read proposal.md** - Understand what's being built
 2. **Read design.md** (if exists) - Review technical decisions
 3. **Read tasks.md** - Get implementation checklist
-4. **Implement tasks sequentially** - Complete in order
+4. **For each task:**
+   a. **Cross-reference with proposal.md** - Find the exact specification
+   b. **Copy specs from proposal** - Don't rely on memory or assumptions
+   c. **Implement exactly as written** - No deviations
+   d. **Verify against proposal** - Check every detail matches
 5. **Confirm completion** - Ensure every item in \`tasks.md\` is finished before updating statuses
 6. **Update checklist** - After all work is done, set every task to \`- [x]\` so the list reflects reality
 7. **Approval gate** - Do not start implementation until the proposal is reviewed and approved
+
+**CRITICAL Implementation Rules:**
+
+**RULE 1: Strict Adherence to Proposal**
+- **MUST** implement exactly as specified in proposal.md and tasks.md
+- **MUST** use the exact API endpoints, request/response formats defined in proposal
+- **MUST** follow the exact call chain specified in tasks.md
+- **MUST NOT** change method signatures, parameter types, or return types without updating proposal first
+- **MUST NOT** add new dependencies or change architecture without proposal update
+
+**RULE 2: Input/Output Compliance**
+- **MUST** implement the exact interface/DTO structures defined in proposal
+- **MUST** validate all inputs as specified in the proposal
+- **MUST** return data in the exact format specified in response body
+- **MUST** handle all error cases with the exact status codes defined in proposal
+
+**RULE 3: Call Chain Compliance**
+- **MUST** call methods in the exact order specified in "Call Chain" section
+- **MUST** use the exact service/repository methods listed in "Uses:" section
+- **MUST NOT** skip intermediate layers (e.g., Controller must call Service, not Repository directly)
+- **MUST NOT** introduce new method calls not listed in proposal
+
+**RULE 4: Verification Before Completion**
+- **MUST** verify each task using the "Verification" method specified
+- **MUST** test with the exact request/response examples from proposal
+- **MUST NOT** mark task as complete without verification passing
+
+**Example Compliance Check:**
+\`\`\`markdown
+Proposal specifies:
+  - API: POST /api/users/register
+  - Request Body: { email, password, name }
+  - Response: { id, email, name, createdAt }
+  - Call Chain: Controller → UserService.createUser() → UserRepository.save()
+
+Implementation MUST:
+  ✓ Use exact path: POST /api/users/register (not /users or /api/register)
+  ✓ Accept exact fields: email, password, name (not username or firstName/lastName)
+  ✓ Return exact fields: id, email, name, createdAt (not userId or user object)
+  ✓ Call exact method: UserService.createUser() (not UserService.create() or UserService.register())
+  ✓ Follow exact chain: Controller → Service → Repository (not Controller → Repository)
+\`\`\`
+
+**Deviation Protocol:**
+If you discover the proposal is incorrect or incomplete during implementation:
+1. **STOP** implementation immediately
+2. **DOCUMENT** the issue (what's wrong, why it won't work)
+3. **UPDATE** proposal.md and tasks.md with corrected specification
+4. **REQUEST** re-approval if changes are significant
+5. **RESUME** implementation only after proposal is updated
+
+**DO NOT:**
+- Implement "what makes sense" if it differs from proposal
+- Make "small adjustments" without updating proposal
+- Assume "they probably meant X" when proposal says Y
+
 
 ### Stage 3: Archiving Changes
 After deployment, create separate PR to:
@@ -148,6 +231,16 @@ openspec/
 
 ## Creating Change Proposals
 
+**⚠️  MANDATORY FILES: Every change MUST include both proposal.md AND tasks.md!**
+
+A complete change proposal requires:
+1. ✅ \`proposal.md\` - Describes what and why
+2. ✅ \`tasks.md\` - Describes how (step-by-step implementation)
+3. ❓ \`design.md\` - Optional, only if needed (see criteria below)
+4. ❓ \`specs/\` - Optional, only if affecting existing capabilities
+
+**Missing tasks.md = Incomplete proposal = Implementation will fail!**
+
 ### Decision Tree
 
 \`\`\`
@@ -162,9 +255,11 @@ New request?
 
 ### Proposal Structure
 
+**⚠️  You MUST create BOTH files in steps 2 and 4. Creating only one is incomplete!**
+
 1. **Create directory:** \`changes/[change-id]/\` (kebab-case, verb-led, unique)
 
-2. **Write proposal.md:**
+2. **Write proposal.md:** (File 1 of 2 - required)
 \`\`\`markdown
 # Change: [Brief description of change]
 
@@ -186,8 +281,72 @@ New request?
   - Modified Files: table with [File Path, Changes, Reason]
   - Deleted Files: table with [File Path, Reason]
 - **MUST** use specific file paths (e.g., \`src/core/code-scanner.ts\`), not placeholders
+- **MUST** include "API Specification" section for any new/modified APIs:
+  - HTTP Method and Path
+  - Request Parameters (headers, query, path, body)
+  - Response Body (success and error cases)
+  - Status Codes
+- **MUST** include "Data Flow" section showing the call chain:
+  - Controller → Service → Repository pattern
+  - Which methods call which other methods
+  - Data transformation at each step
+- **MUST** include "Implementation Logic" section with:
+  - Step-by-step algorithm for complex operations
+  - Business rules and validation logic
+  - Error handling strategy
 - **SHOULD** include implementation step mapping: which files to change in which order
 - **SHOULD** include code example snippets showing key patterns (decorators, interfaces, etc.)
+
+**Example API Specification in proposal.md:**
+\`\`\`markdown
+### API Specification
+
+#### POST /api/users/register
+
+**Request:**
+- Headers: \`Content-Type: application/json\`
+- Body:
+  \`\`\`typescript
+  interface CreateUserDto {
+    email: string;     // Required, valid email format
+    password: string;  // Required, min 8 chars
+    name: string;      // Required, max 50 chars
+  }
+  \`\`\`
+
+**Response:**
+- Success (201 Created):
+  \`\`\`typescript
+  interface UserResponse {
+    id: string;
+    email: string;
+    name: string;
+    createdAt: Date;
+  }
+  \`\`\`
+- Error (400 Bad Request): \`{ error: "Invalid email format" }\`
+- Error (409 Conflict): \`{ error: "Email already exists" }\`
+
+**Implementation Logic:**
+1. Validate DTO using class-validator
+2. Check email uniqueness in UserRepository
+3. Hash password using PasswordService.hash()
+4. Create User entity
+5. Save to database via UserRepository.save()
+6. Send welcome email asynchronously
+7. Return UserResponse
+
+**Call Chain:**
+\`\`\`
+UserController.register(dto)
+  → UserService.createUser(dto)
+    → UserRepository.findByEmail(email)    [validation]
+    → PasswordService.hash(password)       [security]
+    → UserRepository.save(user)            [persistence]
+    → EmailService.sendWelcome(email)      [notification]
+\`\`\`
+\`\`\`
+
 
 3. **Create spec deltas:** \`specs/[capability]/spec.md\`
 \`\`\`markdown
@@ -216,18 +375,59 @@ If multiple capabilities are affected, create multiple delta files under \`chang
 - **SHOULD** include code examples showing decorators, class structure, or framework patterns
 - **SHOULD** map requirements to actual code locations to prevent AI hallucinations
 
-4. **Create tasks.md:**
+4. **Create tasks.md:** (File 2 of 2 - required)
+
+**⚠️  DO NOT SKIP THIS STEP! proposal.md alone is incomplete!**
+
+**CRITICAL: Tasks.md Structure Requirements**
+
+Every tasks.md MUST start with this mandatory section:
+
 \`\`\`markdown
+# Implementation Tasks
+
+## ⚠️  MANDATORY: Read Before Starting
+
+**Before implementing ANY task below, you MUST:**
+
+1. **Read proposal.md completely** - Understand the full context and requirements
+2. **Review all API specifications in proposal.md** - Note exact endpoints, request/response formats
+3. **Study the call chain diagrams in proposal.md** - Understand data flow
+4. **Review implementation logic in proposal.md** - Follow the exact steps defined
+
+**CRITICAL RULES:**
+- ✅ Use EXACT API paths from proposal.md (do not modify)
+- ✅ Use EXACT request/response structures from proposal.md (do not add/remove fields)
+- ✅ Follow EXACT call chain from proposal.md (do not skip steps)
+- ✅ Implement EXACT business logic from proposal.md (do not simplify)
+- ❌ DO NOT deviate from proposal.md without updating it first
+- ❌ DO NOT "improve" or "optimize" without proposal approval
+
+**Cross-Reference Checklist:**
+For each task below, verify against proposal.md:
+- [ ] API endpoint matches proposal (method + path)
+- [ ] Request body matches proposal (all fields, types, validation)
+- [ ] Response body matches proposal (all fields, status codes)
+- [ ] Call chain matches proposal (same order, same methods)
+- [ ] Business logic matches proposal (same steps, same rules)
+
+---
+
 ## 1. Implementation
 - [ ] 1.1 Create database schema
+  - **Reference**: See "Data Model" section in proposal.md
   - File: \`src/entities/user.entity.ts\`
   - Class: \`User\` (extends BaseEntity)
   - Content: Define user entity with TypeORM decorators
   - Verification: Run \`pnpm typeorm migration:generate\`
 
 - [ ] 1.2 Implement API endpoint
+  - **Reference**: See "API Specification" section in proposal.md for POST /api/users/register
+  - **MUST MATCH**: Exact endpoint path, request body, response body from proposal
   - File: \`src/controllers/user.controller.ts\`
   - Class: \`UserController\`
+  - Method: \`register(dto: CreateUserDto): Promise<UserResponse>\`
+  - API: \`POST /api/users/register\`
   - Method: \`create()\` - POST /users
   - API: \`POST /api/users\` -> \`UserService.createUser()\`
   - Dependencies: Task 1.1 (entity must exist first)
@@ -276,6 +476,8 @@ Each task MUST include:
 *API/Controller Tasks:*
 \`\`\`markdown
 - [ ] 2.1 Create user registration endpoint
+  - **Reference**: See proposal.md "API Specification > POST /api/users/register"
+  - **MUST MATCH**: Use EXACT endpoint, request, response from proposal
   - File: \`src/controllers/user.controller.ts\`
   - Class: \`UserController\`
   - Method: \`register(dto: CreateUserDto): Promise<UserResponse>\`
@@ -286,9 +488,82 @@ Each task MUST include:
   - Verification: Integration test with valid/invalid payloads
 \`\`\`
 
+**CRITICAL for API/Controller Tasks:**
+
+Every API task MUST include:
+1. **Complete Request Specification**
+   - HTTP Method and Path: \`POST /api/users/register\`
+   - Request Headers (if any): \`Authorization: Bearer {token}\`
+   - Request Body Structure:
+     \`\`\`typescript
+     interface CreateUserDto {
+       email: string;     // Format: valid email
+       password: string;  // Min 8 chars, must contain number
+       name: string;      // Max 50 chars
+     }
+     \`\`\`
+   - Query Parameters (if any): \`?page=1&limit=10\`
+   - Path Parameters (if any): \`/users/:userId\`
+
+2. **Complete Response Specification**
+   - Success Response (200/201):
+     \`\`\`typescript
+     interface UserResponse {
+       id: string;        // UUID
+       email: string;
+       name: string;
+       createdAt: Date;
+     }
+     \`\`\`
+   - Error Responses:
+     - 400 Bad Request: \`{ error: "Invalid email format" }\`
+     - 401 Unauthorized: \`{ error: "Token expired" }\`
+     - 409 Conflict: \`{ error: "Email already exists" }\`
+     - 500 Server Error: \`{ error: "Internal server error" }\`
+
+3. **Implementation Code Template**
+   \`\`\`typescript
+   @Controller('users')
+   export class UserController {
+     constructor(private userService: UserService) {}
+     
+     @Post('register')
+     @HttpCode(201)
+     async register(
+       @Body() dto: CreateUserDto
+     ): Promise<UserResponse> {
+       // Step 1: Validate DTO (handled by class-validator)
+       // Step 2: Call service layer
+       const user = await this.userService.createUser(dto);
+       // Step 3: Transform to response
+       return {
+         id: user.id,
+         email: user.email,
+         name: user.name,
+         createdAt: user.createdAt
+       };
+     }
+   }
+   \`\`\`
+
+4. **Call Chain Specification**
+   \`\`\`
+   UserController.register()
+     ├─> Step 1: Validate DTO (class-validator)
+     ├─> Step 2: UserService.createUser(dto)
+     │            ├─> UserService.validateEmail(email)
+     │            ├─> PasswordService.hash(password)
+     │            ├─> UserRepository.save(user)
+     │            └─> EmailService.sendWelcome(email)
+     └─> Step 3: Transform to UserResponse
+   \`\`\`
+
+
 *Service/Business Logic Tasks:*
 \`\`\`markdown
 - [ ] 3.1 Implement user creation logic
+  - **Reference**: See proposal.md "Implementation Logic" and "Call Chain" sections
+  - **MUST MATCH**: Follow EXACT steps and method calls from proposal
   - File: \`src/services/user.service.ts\`
   - Class: \`UserService\`
   - Method: \`createUser(dto: CreateUserDto): Promise<User>\`
@@ -299,6 +574,90 @@ Each task MUST include:
   - Uses: \`UserRepository\`, \`PasswordService.hash()\`, \`EmailService.sendWelcome()\`
   - Verification: Unit test with mocked dependencies
 \`\`\`
+
+**CRITICAL for Service Tasks:**
+
+**FIRST: Review proposal.md for this service's specification**
+
+Every Service task MUST include:
+1. **Complete Method Signature**
+   \`\`\`typescript
+   async createUser(dto: CreateUserDto): Promise<User> {
+     // Input validation
+     // Business logic
+     // Data persistence
+     // Return result
+   }
+   \`\`\`
+
+2. **Input Parameter Specification**
+   \`\`\`typescript
+   interface CreateUserDto {
+     email: string;     // Must be unique, validated format
+     password: string;  // Will be hashed, min 8 chars
+     name: string;      // Display name, max 50 chars
+   }
+   \`\`\`
+
+3. **Return Value Specification**
+   \`\`\`typescript
+   interface User {
+     id: string;           // Generated UUID
+     email: string;        // Normalized lowercase
+     passwordHash: string; // Bcrypt hash
+     name: string;
+     createdAt: Date;      // Auto-generated
+     updatedAt: Date;      // Auto-generated
+   }
+   \`\`\`
+
+4. **Complete Implementation Logic**
+   \`\`\`typescript
+   async createUser(dto: CreateUserDto): Promise<User> {
+     // Step 1: Validate email uniqueness
+     const existing = await this.userRepository.findByEmail(dto.email);
+     if (existing) {
+       throw new ConflictException('Email already exists');
+     }
+     
+     // Step 2: Hash password
+     const passwordHash = await this.passwordService.hash(dto.password);
+     
+     // Step 3: Create user entity
+     const user = this.userRepository.create({
+       email: dto.email.toLowerCase(),
+       passwordHash,
+       name: dto.name
+     });
+     
+     // Step 4: Save to database
+     const savedUser = await this.userRepository.save(user);
+     
+     // Step 5: Send welcome email (async, don't await)
+     this.emailService.sendWelcome(savedUser.email).catch(err => {
+       this.logger.error('Failed to send welcome email', err);
+     });
+     
+     // Step 6: Return created user
+     return savedUser;
+   }
+   \`\`\`
+
+5. **Dependencies and Call Chain**
+   \`\`\`
+   UserService.createUser(dto)
+     ├─> UserRepository.findByEmail(dto.email)      [Check uniqueness]
+     ├─> PasswordService.hash(dto.password)         [Hash password]
+     ├─> UserRepository.create(userData)            [Create entity]
+     ├─> UserRepository.save(user)                  [Persist to DB]
+     └─> EmailService.sendWelcome(user.email)       [Send email async]
+   \`\`\`
+
+6. **Error Handling**
+   - ConflictException: Email already exists
+   - ValidationException: Invalid input format
+   - DatabaseException: Save operation failed
+
 
 *Integration Tasks:*
 \`\`\`markdown

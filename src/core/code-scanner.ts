@@ -871,6 +871,18 @@ export class CodeScanner {
   private extractClassFields(content: string): ClassFieldInfo[] {
     const fields: ClassFieldInfo[] = [];
     
+    // Dependency injection decorators that should NOT be treated as fields
+    const dependencyInjectionDecorators = new Set([
+      'Autowired', 'Resource', 'Inject', 'Qualifier',
+      'InjectRepository', 'InjectModel', 'InjectConnection'
+    ]);
+    
+    // Common utility field names that should be excluded
+    const utilityFieldNames = new Set([
+      'logger', 'log', 'LOGGER', 'LOG',
+      'serialVersionUID' // Java serialization
+    ]);
+    
     // Match various field patterns
     // Pattern 1: @Column() fieldName: type; (TypeScript/NestJS)
     // Pattern 2: private fieldName: type; (TypeScript)
@@ -887,6 +899,12 @@ export class CodeScanner {
       while ((match = pattern.exec(content)) !== null) {
         const decoratorsMatch = match[0].match(/@(\w+)/g);
         const decorators = decoratorsMatch ? decoratorsMatch.map(d => d.substring(1)) : [];
+        
+        // Skip if this field has dependency injection decorators
+        const hasDependencyInjection = decorators.some(d => dependencyInjectionDecorators.has(d));
+        if (hasDependencyInjection) {
+          continue;
+        }
         
         // Find field name and type based on pattern
         let visibility: 'public' | 'private' | 'protected' = 'public';
@@ -913,6 +931,16 @@ export class CodeScanner {
 
         // Skip constructor parameters and duplicates
         if (!fieldName || fields.some(f => f.name === fieldName)) continue;
+        
+        // Skip utility field names
+        if (utilityFieldNames.has(fieldName)) {
+          continue;
+        }
+        
+        // Skip Logger/Log types
+        if (fieldType.includes('Logger') || fieldType.includes('Log')) {
+          continue;
+        }
 
         // Look for JSDoc description
         const fieldPosition = content.indexOf(match[0]);
@@ -936,16 +964,41 @@ export class CodeScanner {
     while ((javaMatch = javaFieldPattern.exec(content)) !== null) {
       const decoratorsStr = javaMatch[1] || '';
       const visibility = (javaMatch[2] as 'public' | 'private' | 'protected') || 'public';
+      const modifier1 = javaMatch[3]; // static or final
+      const modifier2 = javaMatch[4]; // static or final
       const fieldType = javaMatch[5];
       const fieldName = javaMatch[6];
       const defaultValue = javaMatch[7]?.trim();
+      
+      // Skip static final constants (like Logger, configuration constants)
+      const isStatic = modifier1 === 'static' || modifier2 === 'static';
+      const isFinal = modifier1 === 'final' || modifier2 === 'final';
+      if (isStatic && isFinal) {
+        continue; // Skip constants like private static final Logger logger
+      }
+      
+      // Skip Logger/Log fields (common utility fields)
+      if (fieldType.includes('Logger') || fieldType.includes('Log')) {
+        continue;
+      }
 
       // Skip common keywords and method-like patterns
       if (['class', 'interface', 'enum', 'return', 'if', 'for', 'while'].includes(fieldType)) continue;
       if (fields.some(f => f.name === fieldName)) continue;
+      
+      // Skip utility field names
+      if (utilityFieldNames.has(fieldName)) {
+        continue;
+      }
 
       const decoratorsMatch = decoratorsStr.match(/@(\w+)/g);
       const decorators = decoratorsMatch ? decoratorsMatch.map(d => d.substring(1)) : [];
+      
+      // Skip if this field has dependency injection decorators
+      const hasDependencyInjection = decorators.some(d => dependencyInjectionDecorators.has(d));
+      if (hasDependencyInjection) {
+        continue;
+      }
 
       const fieldPosition = content.indexOf(javaMatch[0]);
       const description = this.extractJsDoc(content, fieldPosition);

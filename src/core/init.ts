@@ -732,6 +732,12 @@ export class InitCommand {
     config: OpenSpecConfig
   ): Promise<void> {
     await this.writeTemplateFiles(openspecPath, config, false);
+    
+    // Generate QUICK_START.md in project root (not in openspec/)
+    const projectPath = path.dirname(openspecPath);
+    const quickStartPath = path.join(projectPath, 'QUICK_START.md');
+    const quickStartContent = this.getQuickStartContent();
+    await FileSystemUtils.writeFile(quickStartPath, quickStartContent);
   }
 
   private async ensureTemplateFiles(
@@ -942,48 +948,85 @@ export class InitCommand {
     console.log();
     console.log(chalk.green('✨ 文档生成完成！'));
     console.log();
-    console.log(chalk.yellow('⚠️  重要：文档已生成，但所有类、字段、方法的描述都是空的'));
-    console.log(chalk.yellow('   这是正常的！静态扫描无法理解业务含义'));
+    console.log(chalk.yellow('⚠️  重要提示：文档中类、字段、方法的描述都是空的'));
+    console.log(chalk.yellow('   静态扫描无法理解业务含义，需要 AI 补充关键描述'));
     console.log();
-    console.log(chalk.cyan('📋 接下来请复制以下提示词发给 AI 助手（Cursor/Claude/Qoder）：'));
+    console.log(chalk.cyan('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
+    console.log(chalk.bgYellow.black(' 📋 强制任务：请立即复制以下内容发给 AI 助手 '));
+    console.log(chalk.cyan('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
+    console.log();
+    console.log(chalk.bgWhite.black(' 开始复制 ▼ '));
+    console.log();
+    console.log(chalk.white('我需要你帮我完善项目文档，这是一个强制任务，必须按以下步骤完成：'));
+    console.log();
+    console.log(chalk.white('【第 1 步】读取并理解项目结构'));
+    console.log(chalk.gray('  ├─ 打开并仔细阅读 openspec/project.md'));
+    console.log(chalk.gray('  ├─ 打开并仔细阅读 openspec/modules/*.md 中的每个文件'));
+    console.log(chalk.gray('  └─ 理解项目的整体架构和模块划分'));
+    console.log();
+    console.log(chalk.white('【第 2 步】查看需要补充的内容清单'));
+    console.log(chalk.gray('  └─ 打开 openspec/ai-tasks.md，了解文档结构'));
+    console.log();
+    console.log(chalk.bgRed.white(' 【第 3 步】补充关键类的详细描述（核心任务，不可跳过）'));
+    console.log(chalk.yellow('  ├─ 优先级 1：Controller 类（所有 @RestController、@Controller）'));
+    console.log(chalk.yellow('  │   • 说明这个 Controller 负责哪些业务功能'));
+    console.log(chalk.yellow('  │   • 说明主要的 API 端点用途'));
+    console.log(chalk.yellow('  │   • 说明服务于哪些业务场景'));
+    console.log(chalk.yellow('  ├─ 优先级 2：核心 Service 类（所有 @Service）'));
+    console.log(chalk.yellow('  │   • 说明这个 Service 实现什么业务逻辑'));
+    console.log(chalk.yellow('  │   • 说明核心方法的业务功能'));
+    console.log(chalk.yellow('  │   • 说明在业务流程中的位置'));
+    console.log(chalk.yellow('  ├─ 优先级 3：重要 DTO 类（请求/响应对象）'));
+    console.log(chalk.yellow('  │   • 说明这个 DTO 在哪个 API 中使用'));
+    console.log(chalk.yellow('  │   • 为关键字段添加业务含义（不是所有字段）'));
+    console.log(chalk.yellow('  │   • 临时变量、内部变量可标注"内部使用"或保持为空'));
+    console.log(chalk.yellow('  └─ 其他辅助类：'));
+    console.log(chalk.gray('      • 工具类、配置类、常量类可以简单标注用途'));
+    console.log(chalk.gray('      • 不重要的内部类可以保持描述为空'));
+    console.log();
+    console.log(chalk.white('【第 4 步】补充业务场景（仅核心模块）'));
+    console.log(chalk.gray('  ├─ 在主要模块文档开头的【业务场景】章节'));
+    console.log(chalk.gray('  └─ 说明该模块解决什么业务问题、服务于哪些业务场景'));
+    console.log();
+    console.log(chalk.white('【第 5 步】补充核心业务流程（仅核心模块）'));
+    console.log(chalk.gray('  ├─ 在主要模块文档的【核心业务流程】章节'));
+    console.log(chalk.gray('  └─ 绘制 1-2 个最重要的业务流程调用链'));
+    console.log();
+    console.log(chalk.white('【第 6 步】清理'));
+    console.log(chalk.gray('  └─ 完成后删除 openspec/ai-tasks.md 文件'));
+    console.log();
+    console.log(chalk.bgCyan.black(' ⚠️  补充原则（重要）'));
+    console.log(chalk.cyan('  • 聚焦关键：优先补充 Controller、Service、重要 DTO'));
+    console.log(chalk.cyan('  • 允许空描述：辅助类、临时变量、内部字段可以为空'));
+    console.log(chalk.cyan('  • 质量优先：宁可少而精，不要为了填充而编造'));
+    console.log(chalk.cyan('  • 基于代码：所有描述必须基于实际代码逻辑'));
+    console.log();
+   console.log(chalk.bgGreen.black(' ✅ 验收标准（核心类必须满足）'));
+    console.log(chalk.green('  • 所有 Controller 类都有业务功能说明'));
+    console.log(chalk.green('  • 所有 Service 类都有业务逻辑说明'));
+    console.log(chalk.green('  • 重要 DTO 的关键字段有业务含义说明'));
+    console.log(chalk.green('  • 核心模块有业务场景和流程说明'));
+    console.log(chalk.gray('  • 辅助类、工具类的描述可以简单或为空'));
+    console.log();
+    console.log(chalk.bgWhite.black(' 复制结束 ▲ '));
+    console.log();
+    console.log(chalk.cyan('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
+    console.log();
+    console.log(chalk.magenta('💡 使用说明：'));
+    console.log(chalk.white('  1️⃣  复制上面框内的全部内容（从"开始复制"到"复制结束"）'));
+    console.log(chalk.white('  2️⃣  粘贴给 AI 助手，让 AI 按照步骤完善文档'));
+    console.log(chalk.white('  3️⃣  AI 会补充所有关键类、字段、方法的描述'));
+    console.log(chalk.white('  4️⃣  完成后即可开始开发新功能'));
+    console.log();
     console.log(
-      chalk.gray('────────────────────────────────────────────────────────────')
+      PALETTE.darkGray(
+        '────────────────────────────────────────────────────────────'
+      )
     );
     console.log();
-    console.log(chalk.white('请帮我完善项目文档，按以下步骤操作：'));
+    console.log(PALETTE.white('📚 后续操作提示词示例：'));
     console.log();
-    console.log(chalk.gray('第 1 步：理解项目'));
-    console.log(chalk.white('  - 阅读 openspec/project.md 了解项目整体结构'));
-    console.log(chalk.white('  - 阅读 openspec/modules/*.md 了解各模块代码'));
-    console.log();
-    console.log(chalk.gray('第 2 步：补充所有描述（重点）'));
-    console.log(chalk.white('  - 查看 openspec/ai-tasks.md 了解需要补充的内容'));
-    console.log(chalk.white('  - 为所有类添加业务描述（这个类是做什么的）'));
-    console.log(chalk.white('  - 为所有字段添加业务含义（这个字段代表什么）'));
-    console.log(chalk.white('  - 为所有方法添加功能说明（这个方法做什么）'));
-    console.log(chalk.yellow('  ⚠️  不要遗漏任何一个类、字段、方法！'));
-    console.log();
-    console.log(chalk.gray('第 3 步：补充业务场景'));
-    console.log(chalk.white('  - 在每个模块文档开头的【业务场景】章节'));
-    console.log(chalk.white('  - 说明该模块解决什么业务问题、服务于哪些场景'));
-    console.log();
-    console.log(chalk.gray('第 4 步：补充核心流程'));
-    console.log(chalk.white('  - 在每个模块文档的【核心业务流程】章节'));
-    console.log(chalk.white('  - 说明关键业务逻辑的执行顺序和调用链'));
-    console.log();
-    console.log(chalk.gray('第 5 步：清理'));
-    console.log(chalk.white('  - 完成后删除 openspec/ai-tasks.md 文件'));
-    console.log();
-    console.log(
-      chalk.gray('────────────────────────────────────────────────────────────')
-    );
-    console.log();
-    console.log(chalk.cyan('💡 提示：'));
-    console.log(chalk.white('  - 你可以一次性完成所有步骤，也可以分模块逐个完成'));
-    console.log(chalk.white('  - 建议从业务最核心的模块开始'));
-    console.log(chalk.white('  - 补充描述时，请基于实际代码逻辑，不要编造'));
-    console.log();
-    console.log(PALETTE.white('2. 实现新功能（文档完善后）:'));
+    console.log(PALETTE.white('实现新功能（文档完善后使用）:'));
     console.log(
       PALETTE.lightGray(
         '   "我想实现 [具体功能描述]。'
@@ -1001,10 +1044,11 @@ export class InitCommand {
     );
     console.log(
       PALETTE.lightGray(
-        '   说明需要修改哪些文件、调用哪些类、具体实现逻辑"\n'
+        '   说明需要修改哪些文件、调用哪些类、具体实现逻辑"'
       )
     );
-    console.log(PALETTE.white('3. 了解 OpenSpec 工作流:'));
+    console.log();
+    console.log(PALETTE.white('了解 OpenSpec 工作流:'));
     console.log(
       PALETTE.lightGray(
         '   "请解释 openspec/AGENTS.md 中的工作流程，'
@@ -1013,11 +1057,7 @@ export class InitCommand {
     console.log(
       PALETTE.lightGray('    以及如何在这个项目中协作"')
     );
-    console.log(
-      PALETTE.darkGray(
-        '────────────────────────────────────────────────────────────\n'
-      )
-    );
+    console.log();
 
     // Codex heads-up: prompts installed globally
     const selectedToolIds = new Set(selectedTools.map((t) => t.value));
@@ -1028,6 +1068,34 @@ export class InitCommand {
       );
       console.log();
     }
+
+    // Quick start reminder for next time
+    console.log(
+      PALETTE.darkGray(
+        '────────────────────────────────────────────────────────────'
+      )
+    );
+    console.log();
+    console.log(chalk.cyan('💡 下次打开项目时的快速开始：'));
+    console.log();
+    console.log(chalk.white('场景 1：继续未完成的工作'));
+    console.log(chalk.gray('  openspec list              # 查看所有活动中的变更'));
+    console.log(chalk.gray('  openspec show [change-id]  # 查看具体变更详情'));
+    console.log();
+    console.log(chalk.white('场景 2：实现新功能'));
+    console.log(chalk.gray('  告诉 AI："我想实现 [功能描述]，请创建 OpenSpec 提案"'));
+    console.log(chalk.gray('  AI 会创建：proposal.md + tasks.md'));
+    console.log();
+    console.log(chalk.white('场景 3：实施提案'));
+    console.log(chalk.gray('  告诉 AI："请按照 openspec/changes/[change-id]/tasks.md 实施"'));
+    console.log(chalk.gray('  AI 会严格遵循提案中的规范和逻辑'));
+    console.log();
+    console.log(chalk.white('场景 4：归档已完成的变更'));
+    console.log(chalk.gray('  openspec archive [change-id]  # 功能部署后归档'));
+    console.log();
+    console.log(chalk.magenta('📚 完整的快速开始指南：'));
+    console.log(chalk.gray('  查看 QUICK_START.md（已保存在项目根目录）'));
+    console.log();
   }
 
   private formatToolNames(tools: AIToolOption[]): string {
@@ -1073,12 +1141,254 @@ export class InitCommand {
     console.log();
   }
 
-  private startSpinner(text: string) {
+ private startSpinner(text: string) {
     return ora({
       text,
       stream: process.stdout,
       color: 'gray',
       spinner: PROGRESS_SPINNER,
     }).start();
+  }
+
+  private getQuickStartContent(): string {
+    return `# OpenSpec 快速开始指南
+
+## 📚 项目已初始化？下次使用这个指南
+
+如果你已经初始化过 OpenSpec，下次打开项目时按以下步骤操作：
+
+---
+
+## 🚀 快速工作流
+
+### 场景 1：完善项目文档（首次初始化后）
+
+如果这是首次初始化，文档中的描述都是空的，需要先完善：
+
+\`\`\`bash
+# 1. 查看生成的文档
+cat openspec/project.md
+cat openspec/modules/*.md
+cat openspec/ai-tasks.md
+
+# 2. 复制初始化时显示的"开始复制"到"复制结束"之间的内容
+# 3. 粘贴给 AI 助手，让 AI 按照步骤完善文档
+\`\`\`
+
+AI 会：
+- 补充所有 Controller 类的业务功能说明
+- 补充所有 Service 类的业务逻辑说明
+- 补充重要 DTO 的关键字段描述
+- 补充核心模块的业务场景和流程
+
+---
+
+### 场景 2：实现新功能
+
+文档完善后，开始开发新功能：
+
+\`\`\`bash
+# 告诉 AI：
+"我想实现 [具体功能描述]。
+请基于 openspec/project.md 和模块文档理解项目结构，
+创建详细的 OpenSpec 变更提案，
+说明需要修改哪些文件、调用哪些类、具体实现逻辑"
+\`\`\`
+
+AI 会创建：
+\`\`\`
+openspec/changes/[change-id]/
+  ├── proposal.md   # 提案：为什么做、做什么、影响范围
+  ├── tasks.md      # 任务清单：如何实现（包含完整的 API 规范、调用链）
+  └── design.md     # （可选）技术设计
+\`\`\`
+
+---
+
+### 场景 3：实施提案
+
+提案创建后，开始实施：
+
+\`\`\`bash
+# 告诉 AI：
+"请按照 openspec/changes/[change-id]/tasks.md 实施这个提案"
+\`\`\`
+
+AI 会：
+1. 阅读 \`proposal.md\` 了解规范
+2. 查看 \`tasks.md\` 中的每个任务
+3. 每个任务都会引用 \`proposal.md\` 的具体章节
+4. 严格按照提案中的 API 规范、调用链、业务逻辑实现
+5. 不允许偏离提案（除非先更新提案）
+
+---
+
+### 场景 4：查看项目状态
+
+\`\`\`bash
+# 查看所有活动中的变更
+openspec list
+
+# 查看所有规范
+openspec list --specs
+
+# 查看特定变更的详情
+openspec show [change-id]
+
+# 验证变更
+openspec validate [change-id] --strict
+\`\`\`
+
+---
+
+### 场景 5：归档已完成的变更
+
+功能开发完成并部署后：
+
+\`\`\`bash
+# 归档变更
+openspec archive [change-id]
+
+# 或者非交互式归档
+openspec archive [change-id] --yes
+\`\`\`
+
+---
+
+## 📋 常用命令
+
+| 命令 | 说明 |
+|------|------|
+| \`openspec list\` | 查看所有活动中的变更 |
+| \`openspec list --specs\` | 查看所有规范 |
+| \`openspec show [item]\` | 查看变更或规范详情 |
+| \`openspec validate [item]\` | 验证变更或规范 |
+| \`openspec archive [change-id]\` | 归档已完成的变更 |
+
+---
+
+## 🔄 典型工作流程
+
+\`\`\`
+1. 完善文档（首次）
+   └─ 复制提示词 → AI 补充描述 → 删除 ai-tasks.md
+
+2. 提出需求
+   └─ "我想实现..." → AI 创建 proposal.md + tasks.md
+
+3. 审查提案
+   └─ 检查 API 规范、调用链、业务逻辑是否正确
+
+4. 实施提案
+   └─ "按照 tasks.md 实施" → AI 严格遵循规范实现
+
+5. 验证
+   └─ openspec validate [change-id] --strict
+
+6. 部署后归档
+   └─ openspec archive [change-id]
+\`\`\`
+
+---
+
+## 💡 最佳实践
+
+### ✅ DO（推荐做法）
+
+1. **总是先完善文档**
+   - 让 AI 补充关键类的描述
+   - Controller、Service、DTO 必须有描述
+
+2. **创建提案时要求完整规范**
+   - 必须包含完整的 API 规范（请求/响应）
+   - 必须包含完整的调用链
+   - 必须包含详细的实现逻辑
+
+3. **实施时严格遵循提案**
+   - 不修改 API 路径
+   - 不修改请求/响应字段
+   - 不跳过调用链中的步骤
+
+4. **发现问题先更新提案**
+   - 如果提案有问题，先停止实施
+   - 更新 proposal.md 和 tasks.md
+   - 重新审查后再继续
+
+### ❌ DON'T（避免做法）
+
+1. **不要跳过文档完善**
+   - 没有描述的文档，AI 无法理解业务逻辑
+
+2. **不要只创建 proposal.md**
+   - tasks.md 是必需的，包含实施细节
+
+3. **不要偏离提案实施**
+   - "觉得这样更好"也不行
+   - 必须先更新提案
+
+4. **不要忘记归档**
+   - 已部署的变更要归档
+   - 否则 changes/ 目录会越来越乱
+
+---
+
+## 🆘 常见问题
+
+### Q1: 重新打开项目后，如何继续之前的工作？
+
+\`\`\`bash
+# 1. 查看状态
+openspec list
+
+# 2. 如果有未完成的变更
+openspec show [change-id]
+
+# 3. 继续实施
+# 告诉 AI："请继续实施 openspec/changes/[change-id] 的提案"
+\`\`\`
+
+### Q2: 如何知道文档是否已经完善？
+
+\`\`\`bash
+# 检查 ai-tasks.md 是否存在
+ls openspec/ai-tasks.md
+
+# 如果存在，说明还没完善
+# 如果不存在，说明已经完善
+\`\`\`
+
+### Q3: 提案创建后发现规范不对怎么办？
+
+\`\`\`bash
+# 直接修改文件：
+# - openspec/changes/[change-id]/proposal.md
+# - openspec/changes/[change-id]/tasks.md
+
+# 然后告诉 AI："提案已更新，请重新实施"
+\`\`\`
+
+### Q4: 如何查看项目的完整文档？
+
+\`\`\`bash
+# 主文档
+cat openspec/project.md
+
+# 模块文档
+cat openspec/modules/*.md
+
+# 工作流指南
+cat openspec/AGENTS.md
+\`\`\`
+
+---
+
+## 📚 更多信息
+
+- [完整的 AGENTS.md](openspec/AGENTS.md) - AI 工作流指南
+
+---
+
+*提示：如果忘记了工作流程，随时可以查看这个文件！*
+`;
   }
 }
