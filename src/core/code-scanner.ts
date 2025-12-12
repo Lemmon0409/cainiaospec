@@ -778,8 +778,16 @@ export class CodeScanner {
     
     // Check if there's any field declaration between the JSDoc end and the current position
     const betweenContent = content.substring(jsDocEnd + 2, position);
+    
     // If there's a semicolon, this JSDoc doesn't belong to the current field
     if (betweenContent.includes(';')) {
+      return undefined;
+    }
+    
+    // If there's another field declaration (private/public/protected + type + name), 
+    // this JSDoc doesn't belong to the current field
+    const fieldDeclarationPattern = /(private|public|protected)\s+[\w<>\[\]]+\s+\w+/;
+    if (fieldDeclarationPattern.test(betweenContent)) {
       return undefined;
     }
     
@@ -801,7 +809,14 @@ export class CodeScanner {
       }
     }
     
+    // Join lines and clean up
     const description = descriptionLines.join(' ').trim();
+    
+    // If description is too long (> 200 chars), it's probably not a real description
+    if (description.length > 200) {
+      return undefined;
+    }
+    
     return description.length > 0 ? description : undefined;
   }
 
