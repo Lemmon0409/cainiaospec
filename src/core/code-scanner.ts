@@ -883,6 +883,10 @@ export class CodeScanner {
       'serialVersionUID' // Java serialization
     ]);
     
+    // Extract class body to avoid matching local variables inside methods
+    const classBodyMatch = content.match(/class\s+\w+[^{]*\{([\s\S]*?)\n\s*(?:public|private|protected)?\s*\w+\s*\(/m);
+    const classFieldsSection = classBodyMatch ? classBodyMatch[1] : content;
+    
     // Match various field patterns
     // Pattern 1: @Column() fieldName: type; (TypeScript/NestJS)
     // Pattern 2: private fieldName: type; (TypeScript)
@@ -896,7 +900,7 @@ export class CodeScanner {
 
     for (const pattern of fieldPatterns) {
       let match;
-      while ((match = pattern.exec(content)) !== null) {
+      while ((match = pattern.exec(classFieldsSection)) !== null) {
         const decoratorsMatch = match[0].match(/@(\w+)/g);
         const decorators = decoratorsMatch ? decoratorsMatch.map(d => d.substring(1)) : [];
         
@@ -959,9 +963,10 @@ export class CodeScanner {
     }
 
     // Java field pattern: [annotations] [modifiers] Type fieldName [= value];
+    // IMPORTANT: Only match fields that appear before any method definitions
     const javaFieldPattern = /((?:@\w+(?:\([^)]*\))?\s*)*)\s*(private|public|protected)?\s+(static|final)?\s*(static|final)?\s*([\w<>\[\]]+)\s+(\w+)\s*(?:=\s*([^;]+))?;/g;
     let javaMatch;
-    while ((javaMatch = javaFieldPattern.exec(content)) !== null) {
+    while ((javaMatch = javaFieldPattern.exec(classFieldsSection)) !== null) {
       const decoratorsStr = javaMatch[1] || '';
       const visibility = (javaMatch[2] as 'public' | 'private' | 'protected') || 'public';
       const modifier1 = javaMatch[3]; // static or final
@@ -983,7 +988,7 @@ export class CodeScanner {
       }
 
       // Skip common keywords and method-like patterns
-      if (['class', 'interface', 'enum', 'return', 'if', 'for', 'while'].includes(fieldType)) continue;
+      if (['class', 'interface', 'enum', 'return', 'if', 'for', 'while', 'Result', 'Boolean', 'String'].includes(fieldType)) continue;
       if (fields.some(f => f.name === fieldName)) continue;
       
       // Skip utility field names
