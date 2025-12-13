@@ -1,8 +1,8 @@
-export const OPENSPEC_DIR_NAME = 'openspec';
+export const OPENSPEC_DIR_NAME = 'cainiaospec';
 
 export const OPENSPEC_MARKERS = {
-  start: '<!-- OPENSPEC:START -->',
-  end: '<!-- OPENSPEC:END -->'
+  start: '<!-- CAINIAOSPEC:START -->',
+  end: '<!-- CAINIAOSPEC:END -->'
 };
 
 export interface OpenSpecConfig {

@@ -19,7 +19,7 @@ const require = createRequire(import.meta.url);
 const { version } = require('../../package.json');
 
 program
-  .name('openspec')
+  .name('cainiaospec')
   .description('AI-native system for spec-driven development')
   .version(version);
 
@@ -39,7 +39,7 @@ const toolsOptionDescription = `Configure AI tools non-interactively. Use "all",
 
 program
   .command('init [path]')
-  .description('Initialize OpenSpec in your project')
+  .description('Initialize CainiaoSpec in your project')
   .option('--tools <tools>', toolsOptionDescription)
   .option('-g, --with-impl-guide', 'Generate specs with implementation guidance')
   .option('-s, --scan-code', 'Scan existing code to extract implementation details')
@@ -133,7 +133,7 @@ program
 // Change command with subcommands
 const changeCmd = program
   .command('change')
-  .description('Manage OpenSpec change proposals');
+  .description('Manage CainiaoSpec change proposals');
 
 // Deprecation notice for noun-based commands
 changeCmd.hook('preAction', () => {

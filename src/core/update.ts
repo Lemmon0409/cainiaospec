@@ -11,9 +11,9 @@ export class UpdateCommand {
     const openspecDirName = OPENSPEC_DIR_NAME;
     const openspecPath = path.join(resolvedProjectPath, openspecDirName);
 
-    // 1. Check openspec directory exists
+    // 1. Check cainiaospec directory exists
     if (!await FileSystemUtils.directoryExists(openspecPath)) {
-      throw new Error(`No OpenSpec directory found. Run 'openspec init' first.`);
+      throw new Error(`No CainiaoSpec directory found. Run 'cainiaospec init' first.`);
     }
 
     // 2. Update AGENTS.md (full replacement)
@@ -97,7 +97,7 @@ export class UpdateCommand {
     }
 
     summaryParts.push(
-      `Updated OpenSpec instructions (${instructionFiles.join(', ')})`
+      `Updated CainiaoSpec instructions (${instructionFiles.join(', ')})`
     );
 
     const aiToolFiles = updatedFiles.filter((file) => file !== 'AGENTS.md');

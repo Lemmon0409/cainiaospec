@@ -20,7 +20,7 @@ export class ListCommand {
       try {
         await fs.access(changesDir);
       } catch {
-        throw new Error("No OpenSpec changes directory found. Run 'openspec init' first.");
+        throw new Error("No CainiaoSpec changes directory found. Run 'cainiaospec init' first.");
       }
 
       // Get all directories in changes (excluding archive)

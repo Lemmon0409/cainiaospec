@@ -7,9 +7,9 @@ import { OPENSPEC_MARKERS } from "../../config.js";
 
 // Use POSIX-style paths for consistent logging across platforms.
 const FILE_PATHS: Record<SlashCommandId, string> = {
-  proposal: ".codex/prompts/openspec-proposal.md",
-  apply: ".codex/prompts/openspec-apply.md",
-  archive: ".codex/prompts/openspec-archive.md",
+  proposal: ".codex/prompts/cainiaospec-proposal.md",
+  apply: ".codex/prompts/cainiaospec-apply.md",
+  archive: ".codex/prompts/cainiaospec-archive.md",
 };
 
 export class CodexSlashCommandConfigurator extends SlashCommandConfigurator {
@@ -25,19 +25,19 @@ export class CodexSlashCommandConfigurator extends SlashCommandConfigurator {
     // plus $ARGUMENTS to capture all arguments as a single string.
     const frontmatter: Record<SlashCommandId, string> = {
       proposal: `---
-description: Scaffold a new OpenSpec change and validate strictly.
+description: Scaffold a new CainiaoSpec change and validate strictly.
 argument-hint: request or feature description
 ---
 
 $ARGUMENTS`,
       apply: `---
-description: Implement an approved OpenSpec change and keep tasks in sync.
+description: Implement an approved CainiaoSpec change and keep tasks in sync.
 argument-hint: change-id
 ---
 
 $ARGUMENTS`,
       archive: `---
-description: Archive a deployed OpenSpec change and update specs.
+description: Archive a deployed CainiaoSpec change and update specs.
 argument-hint: change-id
 ---
 

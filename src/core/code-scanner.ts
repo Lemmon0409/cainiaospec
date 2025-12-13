@@ -276,6 +276,11 @@ export class CodeScanner {
   private moduleDependencies: ModuleDependency[] = [];
   // Enhanced: Class dependency tracking
   private classDependencies = new Map<string, ClassDependency>();
+  // Cache compiled regex patterns
+  private excludeRegexCache = new Map<string, RegExp>();
+  // Track scan progress
+  private scannedFiles = 0;
+  private totalFilesToScan = 0;
 
   constructor(options: ScanOptions) {
     this.options = {
@@ -286,10 +291,27 @@ export class CodeScanner {
         '**/build/**',
         '**/.git/**',
         '**/coverage/**',
+        '**/target/**',    // Maven build output
+        '**/.idea/**',     // IntelliJ IDEA
+        '**/.vscode/**',   // VS Code
+        '**/.settings/**', // Eclipse
+        '**/bin/**',       // Java binary output
+        '**/out/**',       // Gradle output
+        '**/*.min.js',     // Minified files
+        '**/*.d.ts',       // TypeScript declarations
+        '**/test/**',      // Test files (usually not needed for docs)
+        '**/tests/**',
+        '**/__tests__/**',
+        '**/spec/**',
       ],
       maxDepth: options.maxDepth || 20,
       rootDir: options.rootDir,
     };
+    
+    // Pre-compile all exclude patterns
+    for (const pattern of this.options.excludePatterns) {
+      this.excludeRegexCache.set(pattern, this.globToRegex(pattern));
+    }
   }
 
   /**
@@ -399,8 +421,16 @@ export class CodeScanner {
 
   private shouldExclude(path: string): boolean {
     const relativePath = relative(this.options.rootDir, path);
+    
+    // Quick check for common exclude directories (optimization)
+    const baseName = basename(path);
+    if (['node_modules', 'dist', 'build', 'target', '.git', '.idea', 'coverage', 'bin', 'out'].includes(baseName)) {
+      return true;
+    }
+    
+    // Use cached regex patterns
     return this.options.excludePatterns.some(pattern => {
-      const regex = this.globToRegex(pattern);
+      const regex = this.excludeRegexCache.get(pattern) || this.globToRegex(pattern);
       return regex.test(relativePath) || regex.test(path);
     });
   }
@@ -554,20 +584,15 @@ export class CodeScanner {
   }
 
   private extractFields(content: string): FieldInfo[] {
-    const fields: FieldInfo[] = [];
-    const fieldRegex = /@Column\([^)]*\)?\s*(\w+)(\?)?:\s*(\w+)/g;
+    const classFields: ClassFieldInfo[] = this.extractClassFields(content);
     
-    let match;
-    while ((match = fieldRegex.exec(content)) !== null) {
-      fields.push({
-        name: match[1],
-        type: match[3],
-        optional: !!match[2],
-        decorators: ['Column'],
-      });
-    }
-
-    return fields;
+    // Convert ClassFieldInfo[] to FieldInfo[] for backward compatibility
+    return classFields.map(f => ({
+      name: f.name,
+      type: f.type,
+      optional: f.optional || false,
+      decorators: f.decorators,
+    }));
   }
 
   private extractRoutes(content: string): RouteInfo[] {
@@ -624,23 +649,14 @@ export class CodeScanner {
   }
 
   private extractMethods(content: string): MethodInfo[] {
-    const methods: MethodInfo[] = [];
-    const methodRegex = /(?:async\s+)?(\w+)\s*\(([^)]*)\)(?:\s*:\s*Promise<(\w+)>|\s*:\s*(\w+))?/g;
+    const methods: ClassMethodInfo[] = this.extractClassMethods(content);
     
-    let match;
-    while ((match = methodRegex.exec(content)) !== null) {
-      const methodName = match[1];
-      // Skip constructors and common non-business methods
-      if (['constructor', 'toString', 'valueOf'].includes(methodName)) continue;
-      
-      methods.push({
-        name: methodName,
-        parameters: match[2]?.split(',').map(p => p.trim()).filter(Boolean) || [],
-        returnType: match[3] || match[4],
-      });
-    }
-
-    return methods;
+    // Convert ClassMethodInfo[] to MethodInfo[] for backward compatibility
+    return methods.map(m => ({
+      name: m.name,
+      parameters: m.parameters.map(p => p.name + ': ' + p.type),
+      returnType: m.returnType,
+    }));
   }
 
   private analyzeDirectoryStructure(): void {
@@ -884,8 +900,9 @@ export class CodeScanner {
     ]);
     
     // Extract class body to avoid matching local variables inside methods
-    const classBodyMatch = content.match(/class\s+\w+[^{]*\{([\s\S]*?)\n\s*(?:public|private|protected)?\s*\w+\s*\(/m);
-    const classFieldsSection = classBodyMatch ? classBodyMatch[1] : content;
+    // IMPROVED: Find the fields section (before first method definition)
+    // For DTO/Entity classes, fields are the main content, so we need to scan more
+    const classFieldsSection = this.extractFieldsSection(content);
     
     // Match various field patterns
     // Pattern 1: @Column() fieldName: type; (TypeScript/NestJS)
@@ -987,8 +1004,8 @@ export class CodeScanner {
         continue;
       }
 
-      // Skip common keywords and method-like patterns
-      if (['class', 'interface', 'enum', 'return', 'if', 'for', 'while', 'Result', 'Boolean', 'String'].includes(fieldType)) continue;
+      // Skip common keywords and method-like patterns (NOT actual Java types)
+      if (['class', 'interface', 'enum', 'return', 'if', 'for', 'while'].includes(fieldType)) continue;
       if (fields.some(f => f.name === fieldName)) continue;
       
       // Skip utility field names
@@ -1022,25 +1039,93 @@ export class CodeScanner {
     return fields;
   }
 
+  /**
+   * Extract the fields section of a class (before first method definition)
+   * This avoids matching local variables inside methods
+   */
+  private extractFieldsSection(content: string): string {
+    // Find class body start
+    const classMatch = content.match(/class\s+\w+[^{]*\{/);
+    if (!classMatch) {
+      return content.substring(0, 10000);
+    }
+    
+    const classStart = classMatch.index! + classMatch[0].length;
+    const afterClass = content.substring(classStart);
+    
+    // Find first method definition pattern in Java:
+    // [annotations] [visibility] [static] [final] ReturnType methodName(...) {
+    // This pattern looks for: visibility + type + name + ( + ) + {
+    const methodPatterns = [
+      // Java method: public void doSomething() {
+      /(?:^|\n)\s*(?:@\w+(?:\([^)]*\))?\s*)*(?:public|private|protected)\s+(?:static\s+)?(?:final\s+)?(?:synchronized\s+)?(?:<[\w,\s]+>\s+)?[\w<>\[\]\.]+\s+\w+\s*\([^)]*\)\s*(?:throws\s+[\w,\s]+)?\s*\{/,
+      // Constructor pattern: public ClassName(...) {
+      /(?:^|\n)\s*(?:public|private|protected)\s+\w+\s*\([^)]*\)\s*\{/,
+    ];
+    
+    let firstMethodPos = afterClass.length;
+    
+    for (const pattern of methodPatterns) {
+      const match = afterClass.match(pattern);
+      if (match && match.index !== undefined && match.index < firstMethodPos) {
+        firstMethodPos = match.index;
+      }
+    }
+    
+    // Extract fields section (content before first method)
+    // Add some buffer (200 chars) to handle edge cases, but cap at reasonable limit
+    const fieldsSection = afterClass.substring(0, Math.min(firstMethodPos + 200, 20000));
+    
+    return fieldsSection;
+  }
+
   // Enhanced: Extract class methods with full information
   private extractClassMethods(content: string): ClassMethodInfo[] {
     const methods: ClassMethodInfo[] = [];
+    const seen = new Set<string>(); // Track seen methods to avoid duplicates
     
-    // Match method patterns - improved to handle decorators better
-    const methodPattern = /((?:@\w+(?:\([^)]*\))?\s*)*)((?:\/\*\*[\s\S]*?\*\/\s*)?)\n?\s*(private|public|protected)?\s*(async\s+)?(\w+)\s*\(([^)]*)\)(?:\s*:\s*([^{]+))?\s*\{/g;
+    // CRITICAL: Extract only class-level methods from the field section to first real method
+    // This prevents matching code inside method bodies
+    const classBodyMatch = content.match(/class\s+\w+[^{]*\{([\s\S]*)/m);
+    if (!classBodyMatch) return methods;
+    
+    const classBody = classBodyMatch[1];
+    
+    // OPTIMIZED: Simplified Java method pattern to avoid catastrophic backtracking
+    // Removed JavaDoc matching from main regex - will extract separately
+    // Pattern: [annotations] [modifiers] ReturnType methodName(params) [throws] {
+    const javaMethodPattern = /^[ \t]*((?:@\w+(?:\([^)]*\))?\s*)*)(public|private|protected)?\s*(static\s+)?(?:final\s+)?(?:synchronized\s+)?(?:<[\w,\s]+>\s+)?([\w<>\[\]\.]+)\s+(\w+)\s*\(([^)]*)\)(?:\s*throws\s+[\w,\s]+)?\s*\{/gm;
     
     let match;
-    while ((match = methodPattern.exec(content)) !== null) {
+    while ((match = javaMethodPattern.exec(classBody)) !== null) {
       const decoratorsStr = match[1] || '';
-      const jsDocStr = match[2] || '';
-      const visibility = (match[3] as 'public' | 'private' | 'protected') || 'public';
-      const isAsync = !!match[4];
+      const visibility = (match[2] as 'public' | 'private' | 'protected') || 'public';
+      const isStatic = !!match[3];
+      const returnType = match[4]?.trim();
       const methodName = match[5];
       const paramsStr = match[6];
-      const returnType = match[7]?.trim();
 
+      // Skip if this is a static final method (usually utility methods)
       // Skip constructor and common non-business methods, also skip control flow keywords
-      if (['constructor', 'toString', 'valueOf', 'ngOnInit', 'ngOnDestroy', 'if', 'for', 'while', 'switch'].includes(methodName)) continue;
+      if (['constructor', 'toString', 'valueOf', 'equals', 'hashCode', 'clone', 'wait', 'notify', 'notifyAll',
+           'ngOnInit', 'ngOnDestroy', 'finalize',
+           'if', 'for', 'while', 'switch', 'catch', 'try', 'else', 'do',
+           'return', 'throw', 'new', 'class', 'interface', 'extends', 'implements',
+           'static', 'final', 'void', 'int', 'long', 'double', 'float', 'boolean', 'String',
+           'filter', 'map', 'forEach', 'collect'].includes(methodName)) continue;
+
+      // Skip if method name starts with lowercase and is likely a variable or keyword
+      if (methodName.length < 2) continue;
+      
+      // Skip if looks like a field access or lambda
+      if (methodName.includes('.') || methodName.includes('->') || methodName.includes('=>')) continue;
+
+      // Create unique method signature to detect duplicates
+      const methodSignature = `${methodName}(${paramsStr})`;
+      if (seen.has(methodSignature)) {
+        continue; // Skip duplicate methods
+      }
+      seen.add(methodSignature);
 
       const decoratorsMatch = decoratorsStr.match(/@(\w+)/g);
       const decorators = decoratorsMatch ? decoratorsMatch.map(d => d.substring(1)) : [];
@@ -1048,26 +1133,20 @@ export class CodeScanner {
       // Parse parameters
       const parameters = this.parseMethodParameters(paramsStr);
 
-      // Extract description from JSDoc
-      let description: string | undefined;
-      if (jsDocStr) {
-        const descMatch = jsDocStr.match(/\/\*\*\s*\n?\s*\*?\s*([^@\n*][^\n]*)/m);
-        if (descMatch) {
-          description = descMatch[1].trim();
-        }
-      }
+      // Extract description from JSDoc (look back from method position)
+      const methodPosition = content.indexOf(match[0]);
+      const description = this.extractJsDoc(content, methodPosition);
 
       // Extract business logic from method body (first comment or logic hint)
-      const methodPosition = content.indexOf(match[0]);
       const businessLogic = this.extractMethodBusinessLogic(content, methodPosition + match[0].length);
 
       methods.push({
         name: methodName,
         description,
         parameters,
-        returnType,
+        returnType: returnType || 'void',
         decorators,
-        isAsync,
+        isAsync: false,
         visibility,
         businessLogic,
       });
@@ -1141,47 +1220,62 @@ export class CodeScanner {
 
   // Enhanced: Extract business logic hint from method body
   private extractMethodBusinessLogic(content: string, startPosition: number): string | undefined {
-    // Find the method body (until matching closing brace)
+    // Limit extraction to avoid pulling in large code blocks
+    const maxLength = 500; // Maximum characters to scan
+    const scanContent = content.substring(startPosition, startPosition + maxLength);
+    
+    // Find the method body (until matching closing brace or maxLength)
     let depth = 1;
-    let pos = startPosition;
+    let pos = 0;
     let bodyContent = '';
     
-    while (pos < content.length && depth > 0) {
-      const char = content[pos];
+    while (pos < scanContent.length && depth > 0 && bodyContent.length < 300) {
+      const char = scanContent[pos];
       if (char === '{') depth++;
       else if (char === '}') depth--;
       if (depth > 0) bodyContent += char;
       pos++;
     }
 
-    // Look for business logic indicators
+    // IMPORTANT: Do NOT extract actual code, only logic patterns
     const logicIndicators: string[] = [];
 
     // Check for validation logic
     if (bodyContent.includes('validate') || bodyContent.includes('Validator')) {
-      logicIndicators.push('Performs validation');
+      logicIndicators.push('数据验证');
     }
     // Check for database operations
-    if (bodyContent.includes('save(') || bodyContent.includes('create(') || bodyContent.includes('update(')) {
-      logicIndicators.push('Database write operation');
+    if (bodyContent.includes('save(') || bodyContent.includes('insert(') || bodyContent.includes('create(')) {
+      logicIndicators.push('数据写入');
     }
-    if (bodyContent.includes('find(') || bodyContent.includes('findOne(') || bodyContent.includes('query(')) {
-      logicIndicators.push('Database read operation');
+    if (bodyContent.includes('update(') || bodyContent.includes('modify(')) {
+      logicIndicators.push('数据更新');
+    }
+    if (bodyContent.includes('find(') || bodyContent.includes('query(') || bodyContent.includes('select(')) {
+      logicIndicators.push('数据查询');
+    }
+    if (bodyContent.includes('delete(') || bodyContent.includes('remove(')) {
+      logicIndicators.push('数据删除');
     }
     // Check for external API calls
-    if (bodyContent.includes('fetch(') || bodyContent.includes('axios') || bodyContent.includes('httpClient')) {
-      logicIndicators.push('External API call');
+    if (bodyContent.includes('fetch(') || bodyContent.includes('axios') || bodyContent.includes('httpClient') || bodyContent.includes('RestTemplate')) {
+      logicIndicators.push('外部API调用');
     }
     // Check for transaction handling
-    if (bodyContent.includes('transaction') || bodyContent.includes('Transaction')) {
-      logicIndicators.push('Transaction management');
+    if (bodyContent.includes('transaction') || bodyContent.includes('Transaction') || bodyContent.includes('@Transactional')) {
+      logicIndicators.push('事务管理');
     }
     // Check for event emission
-    if (bodyContent.includes('emit(') || bodyContent.includes('publish(')) {
-      logicIndicators.push('Event emission');
+    if (bodyContent.includes('emit(') || bodyContent.includes('publish(') || bodyContent.includes('sendEvent')) {
+      logicIndicators.push('事件发布');
+    }
+    // Check for cache operations
+    if (bodyContent.includes('cache') || bodyContent.includes('Cache') || bodyContent.includes('redis')) {
+      logicIndicators.push('缓存操作');
     }
 
-    return logicIndicators.length > 0 ? logicIndicators.join(', ') : undefined;
+    // Return ONLY pattern indicators, NOT code
+    return logicIndicators.length > 0 ? logicIndicators.join('、') : undefined;
   }
 
   // Enhanced: Extract dependencies from constructor

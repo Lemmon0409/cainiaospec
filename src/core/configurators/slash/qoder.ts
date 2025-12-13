@@ -4,17 +4,17 @@ import { SlashCommandId } from '../../templates/index.js';
 /**
  * File paths for Qoder slash commands
  * Maps each OpenSpec workflow stage to its command file location
- * Commands are stored in .qoder/commands/openspec/ directory
+ * Commands are stored in .qoder/commands/cainiaospec/ directory
  */
 const FILE_PATHS: Record<SlashCommandId, string> = {
   // Create and validate new change proposals
-  proposal: '.qoder/commands/openspec/proposal.md',
+  proposal: '.qoder/commands/cainiaospec/proposal.md',
   
   // Implement approved changes with task tracking
-  apply: '.qoder/commands/openspec/apply.md',
+  apply: '.qoder/commands/cainiaospec/apply.md',
   
   // Archive completed changes and update specs
-  archive: '.qoder/commands/openspec/archive.md'
+  archive: '.qoder/commands/cainiaospec/archive.md'
 };
 
 /**
@@ -25,21 +25,21 @@ const FILE_PATHS: Record<SlashCommandId, string> = {
 const FRONTMATTER: Record<SlashCommandId, string> = {
   proposal: `---
 name: OpenSpec: Proposal
-description: Scaffold a new OpenSpec change and validate strictly.
-category: OpenSpec
-tags: [openspec, change]
+description: Scaffold a new CainiaoSpec change and validate strictly.
+category: CainiaoSpec
+tags: [cainiaospec, change]
 ---`,
   apply: `---
 name: OpenSpec: Apply
-description: Implement an approved OpenSpec change and keep tasks in sync.
-category: OpenSpec
-tags: [openspec, apply]
+description: Implement an approved CainiaoSpec change and keep tasks in sync.
+category: CainiaoSpec
+tags: [cainiaospec, apply]
 ---`,
   archive: `---
 name: OpenSpec: Archive
-description: Archive a deployed OpenSpec change and update specs.
-category: OpenSpec
-tags: [openspec, archive]
+description: Archive a deployed CainiaoSpec change and update specs.
+category: CainiaoSpec
+tags: [cainiaospec, archive]
 ---`
 };
 
@@ -48,7 +48,7 @@ tags: [openspec, archive]
  * 
  * Manages OpenSpec slash commands for Qoder AI assistant.
  * Creates three workflow commands: proposal, apply, and archive.
- * Uses colon-separated command format (/openspec:proposal).
+ * Uses colon-separated command format (/cainiaospec:proposal).
  * 
  * @extends {SlashCommandConfigurator}
  */

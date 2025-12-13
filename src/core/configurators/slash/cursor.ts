@@ -2,29 +2,29 @@ import { SlashCommandConfigurator } from './base.js';
 import { SlashCommandId } from '../../templates/index.js';
 
 const FILE_PATHS: Record<SlashCommandId, string> = {
-  proposal: '.cursor/commands/openspec-proposal.md',
-  apply: '.cursor/commands/openspec-apply.md',
-  archive: '.cursor/commands/openspec-archive.md'
+  proposal: '.cursor/commands/cainiaospec-proposal.md',
+  apply: '.cursor/commands/cainiaospec-apply.md',
+  archive: '.cursor/commands/cainiaospec-archive.md'
 };
 
 const FRONTMATTER: Record<SlashCommandId, string> = {
   proposal: `---
-name: /openspec-proposal
-id: openspec-proposal
-category: OpenSpec
-description: Scaffold a new OpenSpec change and validate strictly.
+name: /cainiaospec-proposal
+id: cainiaospec-proposal
+category: CainiaoSpec
+description: Scaffold a new CainiaoSpec change and validate strictly.
 ---`,
   apply: `---
-name: /openspec-apply
-id: openspec-apply
-category: OpenSpec
-description: Implement an approved OpenSpec change and keep tasks in sync.
+name: /cainiaospec-apply
+id: cainiaospec-apply
+category: CainiaoSpec
+description: Implement an approved CainiaoSpec change and keep tasks in sync.
 ---`,
   archive: `---
-name: /openspec-archive
-id: openspec-archive
-category: OpenSpec
-description: Archive a deployed OpenSpec change and update specs.
+name: /cainiaospec-archive
+id: cainiaospec-archive
+category: CainiaoSpec
+description: Archive a deployed CainiaoSpec change and update specs.
 ---`
 };
 

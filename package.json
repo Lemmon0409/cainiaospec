@@ -27,7 +27,7 @@
     }
   },
   "bin": {
-    "openspec": "./bin/openspec.js"
+    "cainiaospec": "./bin/openspec.js"
   },
   "files": [
     "dist",

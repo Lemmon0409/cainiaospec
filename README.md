@@ -94,7 +94,21 @@
 
 ---
 
-### 4. 🔧 字段和方法识别的精准优化
+### 4. 🔄 归档时自动更新项目文档
+
+| 功能 | 原版 OpenSpec | 增强版 |
+|------|--------------|--------|
+| **生成实施总结** | ✅ 支持 | ✅ 支持 |
+| **自动更新项目文档** | ❌ 不支持 | ✅ **自动扫描变更，更新到 project.md** |
+| **新增类自动添加** | ❌ 手动添加 | ✅ 自动提取并添加到文档 |
+| **模块化文档支持** | ❌ 不支持 | ✅ 自动识别模块，分文件存储 |
+| **保留用户描述** | - | ✅ 不覆盖 AI 补充的业务描述 |
+
+**效果**：归档后文档自动同步最新代码，AI 始终能看到最新的项目结构！
+
+---
+
+### 5. 🔧 字段和方法识别的精准优化
 
 #### ❌ 原版问题示例
 
@@ -353,9 +367,22 @@ openspec archive add-user-login
 # 非交互式归档
 openspec archive add-user-login --yes
 
+# 跳过规范更新（只归档文件，不更新 specs）
+openspec archive add-user-login --skip-specs
+
 # 归档多个变更
 openspec archive add-login add-register --yes
 ```
+
+**归档时自动执行**：
+
+1. ✅ 生成 `implementation-summary.md`（实施总结）
+2. ✅ **自动更新项目文档**（新增！）
+   - 扫描变更中的代码文件
+   - 提取新增/修改的类、方法、API
+   - 更新到 `openspec/project.md` 或 `openspec/modules/*.md`
+3. ✅ 更新规范文件（`openspec/specs/*/spec.md`）
+4. ✅ 移动到归档目录（`openspec/changes/archive/`）
 
 ---
 

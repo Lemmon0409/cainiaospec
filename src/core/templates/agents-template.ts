@@ -1,15 +1,15 @@
-export const agentsTemplate = `# OpenSpec Instructions
+export const agentsTemplate = `# CainiaoSpec Instructions
 
-Instructions for AI coding assistants using OpenSpec for spec-driven development.
+Instructions for AI coding assistants using CainiaoSpec for spec-driven development.
 
 ## TL;DR Quick Checklist
 
-- Search existing work: \`openspec spec list --long\`, \`openspec list\` (use \`rg\` only for full-text search)
+- Search existing work: \`cainiaospec spec list --long\`, \`cainiaospec list\` (use \`rg\` only for full-text search)
 - Decide scope: new capability vs modify existing capability
 - Pick a unique \`change-id\`: kebab-case, verb-led (\`add-\`, \`update-\`, \`remove-\`, \`refactor-\`)
 - **MUST create ALL files**: \`proposal.md\`, \`tasks.md\`, \`design.md\` (only if needed), and delta specs per affected capability
 - Write deltas: use \`## ADDED|MODIFIED|REMOVED|RENAMED Requirements\`; include at least one \`#### Scenario:\` per requirement
-- Validate: \`openspec validate [change-id] --strict\` and fix issues
+- Validate: \`cainiaospec validate [change-id] --strict\` and fix issues
 - Request approval: Do not start implementation until proposal is approved
 
 **⚠️  CRITICAL: You MUST create both proposal.md AND tasks.md for every change. Creating only one file is incomplete!**
@@ -43,15 +43,15 @@ Skip proposal for:
 - Tests for existing behavior
 
 **Workflow**
-1. Review \`openspec/project.md\`, \`openspec list\`, and \`openspec list --specs\` to understand current context.
-2. Choose a unique verb-led \`change-id\` and create directory: \`openspec/changes/<id>/\`
+1. Review \`cainiaospec/project.md\`, \`cainiaospec list\`, and \`cainiaospec list --specs\` to understand current context.
+2. Choose a unique verb-led \`change-id\` and create directory: \`cainiaospec/changes/<id>/\`
 3. **MUST create these files** (in order):
    - \`proposal.md\` - The "what" and "why"
    - \`tasks.md\` - The "how" (step-by-step implementation)
    - \`design.md\` (optional) - Technical decisions if needed
    - \`specs/\` - Delta specs if affecting capabilities
 4. Draft spec deltas using \`## ADDED|MODIFIED|REMOVED Requirements\` with at least one \`#### Scenario:\` per requirement.
-5. Run \`openspec validate <id> --strict\` and resolve any issues before sharing the proposal.
+5. Run \`cainiaospec validate <id> --strict\` and resolve any issues before sharing the proposal.
 
 **⚠️  Common Mistake: DO NOT create only proposal.md and stop. You MUST also create tasks.md in the same change!**
 
@@ -143,34 +143,34 @@ If you discover the proposal is incorrect or incomplete during implementation:
 After deployment, create separate PR to:
 - Move \`changes/[name]/\` → \`changes/archive/YYYY-MM-DD-[name]/\`
 - Update \`specs/\` if capabilities changed
-- Use \`openspec archive <change-id> --skip-specs --yes\` for tooling-only changes (always pass the change ID explicitly)
-- Run \`openspec validate --strict\` to confirm the archived change passes checks
+- Use \`cainiaospec archive <change-id> --skip-specs --yes\` for tooling-only changes (always pass the change ID explicitly)
+- Run \`cainiaospec validate --strict\` to confirm the archived change passes checks
 
 ## Before Any Task
 
 **Context Checklist:**
 - [ ] Read relevant specs in \`specs/[capability]/spec.md\`
 - [ ] Check pending changes in \`changes/\` for conflicts
-- [ ] **Read \`openspec/project.md\` for project structure and module overview**
-- [ ] **Read relevant \`openspec/modules/*.md\` to understand existing classes and APIs**
-- [ ] Run \`openspec list\` to see active changes
-- [ ] Run \`openspec list --specs\` to see existing capabilities
+- [ ] **Read \`cainiaospec/project.md\` for project structure and module overview**
+- [ ] **Read relevant \`cainiaospec/modules/*.md\` to understand existing classes and APIs**
+- [ ] Run \`cainiaospec list\` to see active changes
+- [ ] Run \`cainiaospec list --specs\` to see existing capabilities
 
 **Before Creating Specs:**
 - Always check if capability already exists
 - Prefer modifying existing specs over creating duplicates
-- Use \`openspec show [spec]\` to review current state
+- Use \`cainiaospec show [spec]\` to review current state
 - **Based on project documentation, identify which module the feature belongs to**
 - **Check existing classes in the target module to avoid duplication**
 - If request is ambiguous, ask 1–2 clarifying questions before scaffolding
 
 ### Search Guidance
-- Enumerate specs: \`openspec spec list --long\` (or \`--json\` for scripts)
-- Enumerate changes: \`openspec list\` (or \`openspec change list --json\` - deprecated but available)
+- Enumerate specs: \`cainiaospec spec list --long\` (or \`--json\` for scripts)
+- Enumerate changes: \`cainiaospec list\` (or \`openspec change list --json\` - deprecated but available)
 - Show details:
-  - Spec: \`openspec show <spec-id> --type spec\` (use \`--json\` for filters)
-  - Change: \`openspec show <change-id> --json --deltas-only\`
-- Full-text search (use ripgrep): \`rg -n "Requirement:|Scenario:" openspec/specs\`
+  - Spec: \`cainiaospec show <spec-id> --type spec\` (use \`--json\` for filters)
+  - Change: \`cainiaospec show <change-id> --json --deltas-only\`
+- Full-text search (use ripgrep): \`rg -n "Requirement:|Scenario:" cainiaospec/specs\`
 
 ## Quick Start
 
@@ -178,26 +178,26 @@ After deployment, create separate PR to:
 
 \`\`\`bash
 # Essential commands
-openspec list                  # List active changes
-openspec list --specs          # List specifications
-openspec show [item]           # Display change or spec
-openspec validate [item]       # Validate changes or specs
-openspec archive <change-id> [--yes|-y]   # Archive after deployment (add --yes for non-interactive runs)
+cainiaospec list                  # List active changes
+cainiaospec list --specs          # List specifications
+cainiaospec show [item]           # Display change or spec
+cainiaospec validate [item]       # Validate changes or specs
+cainiaospec archive <change-id> [--yes|-y]   # Archive after deployment (add --yes for non-interactive runs)
 
 # Project management
-openspec init [path]           # Initialize OpenSpec
-openspec init --with-impl-guide  # Initialize with implementation guidance
-openspec init --scan-code --with-impl-guide  # Scan code and generate guidance
-openspec init --frameworks nestjs,typeorm  # Specify frameworks explicitly
-openspec update [path]         # Update instruction files
+cainiaospec init [path]           # Initialize OpenSpec
+cainiaospec init --with-impl-guide  # Initialize with implementation guidance
+cainiaospec init --scan-code --with-impl-guide  # Scan code and generate guidance
+cainiaospec init --frameworks nestjs,typeorm  # Specify frameworks explicitly
+cainiaospec update [path]         # Update instruction files
 
 # Interactive mode
-openspec show                  # Prompts for selection
-openspec validate              # Bulk validation mode
+cainiaospec show                  # Prompts for selection
+cainiaospec validate              # Bulk validation mode
 
 # Debugging
-openspec show [change] --json --deltas-only
-openspec validate [change] --strict
+cainiaospec show [change] --json --deltas-only
+cainiaospec validate [change] --strict
 \`\`\`
 
 ### Command Flags
@@ -212,7 +212,7 @@ openspec validate [change] --strict
 ## Directory Structure
 
 \`\`\`
-openspec/
+cainiaospec/
 ├── project.md              # Project conventions
 ├── specs/                  # Current truth - what IS built
 │   └── [capability]/       # Single focused capability
@@ -671,7 +671,7 @@ Every Service task MUST include:
 \`\`\`
 
 **Important:** When creating tasks.md for code changes:
-- **MUST** base on \`openspec/project.md\` and \`openspec/modules/*.md\` to understand existing code structure
+- **MUST** base on \`cainiaospec/project.md\` and \`cainiaospec/modules/*.md\` to understand existing code structure
 - **MUST** include specific file paths for each task (e.g., \`src/services/user.service.ts\`)
 - **MUST** reference concrete code locations (e.g., \`UserController.create() in src/controllers/user.controller.ts\`)
 - **MUST** specify which files to create, modify, or delete
@@ -757,7 +757,7 @@ Headers matched with \`trim(header)\` - whitespace ignored.
 Common pitfall: Using MODIFIED to add a new concern without including the previous text. This causes loss of detail at archive time. If you aren’t explicitly changing the existing requirement, add a new requirement under ADDED instead.
 
 Authoring a MODIFIED requirement correctly:
-1) Locate the existing requirement in \`openspec/specs/<capability>/spec.md\`.
+1) Locate the existing requirement in \`cainiaospec/specs/<capability>/spec.md\`.
 2) Copy the entire requirement block (from \`### Requirement: ...\` through its scenarios).
 3) Paste it under \`## MODIFIED Requirements\` and edit to reflect the new behavior.
 4) Ensure the header text matches exactly (whitespace-insensitive) and keep at least one \`#### Scenario:\`.
@@ -783,39 +783,39 @@ Example for RENAMED:
 
 **Silent scenario parsing failures**
 - Exact format required: \`#### Scenario: Name\`
-- Debug with: \`openspec show [change] --json --deltas-only\`
+- Debug with: \`cainiaospec show [change] --json --deltas-only\`
 
 ### Validation Tips
 
 \`\`\`bash
 # Always use strict mode for comprehensive checks
-openspec validate [change] --strict
+cainiaospec validate [change] --strict
 
 # Debug delta parsing
-openspec show [change] --json | jq '.deltas'
+cainiaospec show [change] --json | jq '.deltas'
 
 # Check specific requirement
-openspec show [spec] --json -r 1
+cainiaospec show [spec] --json -r 1
 \`\`\`
 
 ## Happy Path Script
 
 \`\`\`bash
 # 1) Explore current state
-openspec spec list --long
-openspec list
+cainiaospec spec list --long
+cainiaospec list
 # Optional full-text search:
-# rg -n "Requirement:|Scenario:" openspec/specs
-# rg -n "^#|Requirement:" openspec/changes
+# rg -n "Requirement:|Scenario:" cainiaospec/specs
+# rg -n "^#|Requirement:" cainiaospec/changes
 
 # 2) Choose change id and scaffold
 CHANGE=add-two-factor-auth
-mkdir -p openspec/changes/$CHANGE/{specs/auth}
-printf "## Why\\n...\\n\\n## What Changes\\n- ...\\n\\n## Impact\\n- ...\\n" > openspec/changes/$CHANGE/proposal.md
-printf "## 1. Implementation\\n- [ ] 1.1 ...\\n" > openspec/changes/$CHANGE/tasks.md
+mkdir -p cainiaospec/changes/$CHANGE/{specs/auth}
+printf "## Why\\n...\\n\\n## What Changes\\n- ...\\n\\n## Impact\\n- ...\\n" > cainiaospec/changes/$CHANGE/proposal.md
+printf "## 1. Implementation\\n- [ ] 1.1 ...\\n" > cainiaospec/changes/$CHANGE/tasks.md
 
 # 3) Add deltas (example)
-cat > openspec/changes/$CHANGE/specs/auth/spec.md << 'EOF'
+cat > cainiaospec/changes/$CHANGE/specs/auth/spec.md << 'EOF'
 ## ADDED Requirements
 ### Requirement: Two-Factor Authentication
 Users MUST provide a second factor during login.
@@ -826,13 +826,13 @@ Users MUST provide a second factor during login.
 EOF
 
 # 4) Validate
-openspec validate $CHANGE --strict
+cainiaospec validate $CHANGE --strict
 \`\`\`
 
 ## Multi-Capability Example
 
 \`\`\`
-openspec/changes/add-2fa-notify/
+cainiaospec/changes/add-2fa-notify/
 ├── proposal.md
 ├── tasks.md
 └── specs/
@@ -898,7 +898,7 @@ Only add complexity with:
 ## Error Recovery
 
 ### Change Conflicts
-1. Run \`openspec list\` to see active changes
+1. Run \`cainiaospec list\` to see active changes
 2. Check for overlapping specs
 3. Coordinate with change owners
 4. Consider combining proposals
@@ -930,10 +930,10 @@ Only add complexity with:
 
 ### CLI Essentials
 \`\`\`bash
-openspec list              # What's in progress?
-openspec show [item]       # View details
-openspec validate --strict # Is it correct?
-openspec archive <change-id> [--yes|-y]  # Mark complete (add --yes for automation)
+cainiaospec list              # What's in progress?
+cainiaospec show [item]       # View details
+cainiaospec validate --strict # Is it correct?
+cainiaospec archive <change-id> [--yes|-y]  # Mark complete (add --yes for automation)
 \`\`\`
 
 Remember: Specs are truth. Changes are proposals. Keep them in sync.

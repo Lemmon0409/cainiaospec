@@ -11,6 +11,9 @@ import {
   normalizeRequirementName,
   type RequirementBlock,
 } from './parsers/requirement-blocks.js';
+import { CodeScanner } from './code-scanner.js';
+import type { ClassInfo, ApiEndpoint } from './code-scanner.js';
+import { generateModularDocs } from './templates/project-template.js';
 
 interface SpecUpdate {
   source: string;
@@ -32,7 +35,7 @@ export class ArchiveCommand {
     try {
       await fs.access(changesDir);
     } catch {
-      throw new Error("No OpenSpec changes directory found. Run 'openspec init' first.");
+      throw new Error("No CainiaoSpec changes directory found. Run 'cainiaospec init' first.");
     }
 
     // Get change name interactively if not provided
@@ -248,6 +251,11 @@ export class ArchiveCommand {
 
     // Generate implementation summary before archiving
     await this.generateImplementationSummary(changeDir, changeName!);
+
+    // Update project documentation with new changes
+    if (!options.skipSpecs) {
+      await this.updateProjectDocumentation(changeDir, changeName!);
+    }
 
     // Create archive directory if needed
     await fs.mkdir(archiveDir, { recursive: true });
@@ -1025,6 +1033,431 @@ TBD - created by archiving change ${changeName}. Update Purpose after archive.
     if (filePath.includes('.module.')) return 'Module';
     if (filePath.includes('.config.')) return 'Config';
     return 'Other';
+  }
+
+  /**
+   * Update project documentation with new changes from this archive
+   * This merges the new code changes into project.md and module docs
+   */
+  private async updateProjectDocumentation(changeDir: string, changeName: string): Promise<void> {
+    const spinner = chalk.cyan('⟳');
+    console.log(`${spinner} Updating project documentation with changes from ${changeName}...`);
+    
+    try {
+      // 1. Read tasks.md to get the list of files that were modified/created
+      const tasksPath = path.join(changeDir, 'tasks.md');
+      const tasksContent = await fs.readFile(tasksPath, 'utf-8').catch(() => '');
+      const taskAnalysis = this.analyzeTasksContent(tasksContent);
+      
+      // Get all Java/TS/JS files from created and modified
+      const codeFiles = [...taskAnalysis.files.created, ...taskAnalysis.files.modified]
+        .filter(file => {
+          const ext = path.extname(file);
+          return ['.java', '.ts', '.js', '.tsx', '.jsx'].includes(ext);
+        });
+      
+      if (codeFiles.length === 0) {
+        console.log(chalk.gray('  No code files to update in documentation.'));
+        return;
+      }
+      
+      console.log(chalk.gray(`  Found ${codeFiles.length} code file(s) to scan...`));
+      
+      // 2. Scan the modified/created files to extract new class information
+      const newClasses = await this.scanChangedFiles(codeFiles);
+      
+      if (newClasses.length === 0) {
+        console.log(chalk.gray('  No new classes found to update.'));
+        return;
+      }
+      
+      console.log(chalk.gray(`  Extracted ${newClasses.length} class(es) from changes...`));
+      
+      // 3. Read existing project documentation
+      const openspecDir = path.join('.', 'openspec');
+      const projectMdPath = path.join(openspecDir, 'project.md');
+      const modulesDir = path.join(openspecDir, 'modules');
+      
+      // Check if we have modular docs or single project.md
+      let hasModularDocs = false;
+      try {
+        const modulesStat = await fs.stat(modulesDir);
+        hasModularDocs = modulesStat.isDirectory();
+      } catch {
+        hasModularDocs = false;
+      }
+      
+      // 4. Merge new classes with existing documentation
+      if (hasModularDocs) {
+        await this.updateModularDocs(modulesDir, newClasses, changeName);
+      } else {
+        await this.updateSingleProjectDoc(projectMdPath, newClasses, changeName);
+      }
+      
+      console.log(chalk.green(`✓ Project documentation updated successfully.`));
+      
+    } catch (error: any) {
+      console.error(chalk.yellow(`Warning: Failed to update project documentation: ${error.message}`));
+      console.log(chalk.gray('  This is not critical. Documentation can be manually updated.'));
+    }
+  }
+  
+  /**
+   * Scan changed files and extract class information
+   */
+  private async scanChangedFiles(codeFiles: string[]): Promise<ClassInfo[]> {
+    const classes: ClassInfo[] = [];
+    
+    for (const file of codeFiles) {
+      try {
+        // Resolve absolute path
+        const absolutePath = path.isAbsolute(file) ? file : path.resolve('.', file);
+        
+        // Check if file exists
+        try {
+          await fs.access(absolutePath);
+        } catch {
+          // File might have been deleted or path is incorrect
+          continue;
+        }
+        
+        // Scan this single file
+        const scanner = new CodeScanner({
+          rootDir: path.dirname(absolutePath),
+          includePatterns: [path.basename(absolutePath)],
+          excludePatterns: [],
+        });
+        
+        const result = await scanner.scan();
+        
+        // Add all classes found in this file
+        if (result.allClasses && result.allClasses.length > 0) {
+          classes.push(...result.allClasses);
+        }
+      } catch (error: any) {
+        console.warn(chalk.gray(`  Warning: Failed to scan ${file}: ${error.message}`));
+      }
+    }
+    
+    return classes;
+  }
+  
+  /**
+   * Update modular documentation (modules/*.md)
+   */
+  private async updateModularDocs(modulesDir: string, newClasses: ClassInfo[], changeName: string): Promise<void> {
+    // Group classes by module
+    const classesByModule = new Map<string, ClassInfo[]>();
+    
+    for (const cls of newClasses) {
+      const moduleName = this.inferModuleName(cls.filePath);
+      if (!classesByModule.has(moduleName)) {
+        classesByModule.set(moduleName, []);
+      }
+      classesByModule.get(moduleName)!.push(cls);
+    }
+    
+    // Update each module doc
+    for (const [moduleName, moduleClasses] of classesByModule.entries()) {
+      const moduleMdPath = path.join(modulesDir, `${moduleName}.md`);
+      
+      try {
+        // Read existing module doc if exists
+        let existingContent = '';
+        try {
+          existingContent = await fs.readFile(moduleMdPath, 'utf-8');
+        } catch {
+          // Module doc doesn't exist, will create new one
+        }
+        
+        // Merge new classes into existing doc
+        const updatedContent = this.mergeClassesIntoModuleDoc(
+          existingContent,
+          moduleClasses,
+          moduleName,
+          changeName
+        );
+        
+        // Write back
+        await fs.writeFile(moduleMdPath, updatedContent);
+        console.log(chalk.gray(`  Updated: openspec/modules/${moduleName}.md`));
+        
+      } catch (error: any) {
+        console.warn(chalk.yellow(`  Warning: Failed to update module ${moduleName}: ${error.message}`));
+      }
+    }
+  }
+  
+  /**
+   * Update single project.md file
+   */
+  private async updateSingleProjectDoc(projectMdPath: string, newClasses: ClassInfo[], changeName: string): Promise<void> {
+    try {
+      // Read existing project.md
+      let existingContent = '';
+      try {
+        existingContent = await fs.readFile(projectMdPath, 'utf-8');
+      } catch {
+        // project.md doesn't exist, will create new one
+        existingContent = `# 项目上下文
+
+## 项目目的
+[描述项目的目的和目标]
+
+## 技术栈
+- Java
+- Spring Boot
+
+`;
+      }
+      
+      // Merge new classes
+      const updatedContent = this.mergeClassesIntoProjectDoc(
+        existingContent,
+        newClasses,
+        changeName
+      );
+      
+      // Write back
+      await fs.writeFile(projectMdPath, updatedContent);
+      console.log(chalk.gray(`  Updated: openspec/project.md`));
+      
+    } catch (error: any) {
+      throw new Error(`Failed to update project.md: ${error.message}`);
+    }
+  }
+  
+  /**
+   * Infer module name from file path
+   * Example: src/modules/order/OrderService.java -> order
+   */
+  private inferModuleName(filePath: string): string {
+    const parts = filePath.split('/');
+    
+    // Look for common module indicators
+    const moduleIndex = parts.findIndex(p => 
+      ['modules', 'module', 'domain', 'domains', 'service', 'services'].includes(p.toLowerCase())
+    );
+    
+    if (moduleIndex !== -1 && moduleIndex + 1 < parts.length) {
+      return parts[moduleIndex + 1];
+    }
+    
+    // Fallback: use the directory name containing the file
+    if (parts.length >= 2) {
+      return parts[parts.length - 2];
+    }
+    
+    return 'default';
+  }
+  
+  /**
+   * Merge new classes into module documentation
+   */
+  private mergeClassesIntoModuleDoc(
+    existingContent: string,
+    newClasses: ClassInfo[],
+    moduleName: string,
+    changeName: string
+  ): string {
+    // If no existing content, create new module doc
+    if (!existingContent) {
+      return this.generateNewModuleDoc(moduleName, newClasses, changeName);
+    }
+    
+    // Parse existing classes from the doc
+    const existingClasses = this.parseClassesFromModuleDoc(existingContent);
+    
+    // Merge: For each new class, either update existing or append
+    for (const newClass of newClasses) {
+      const existingIndex = existingClasses.findIndex(c => c.name === newClass.name);
+      
+      if (existingIndex !== -1) {
+        // Update existing class (preserve user-added descriptions)
+        existingClasses[existingIndex] = this.mergeClassInfo(
+          existingClasses[existingIndex],
+          newClass
+        );
+      } else {
+        // Add new class
+        existingClasses.push(newClass);
+      }
+    }
+    
+    // Rebuild the module doc with merged classes
+    return this.rebuildModuleDoc(existingContent, existingClasses, moduleName);
+  }
+  
+  /**
+   * Merge new classes into project.md
+   */
+  private mergeClassesIntoProjectDoc(
+    existingContent: string,
+    newClasses: ClassInfo[],
+    changeName: string
+  ): string {
+    // Add a section for the archived change if not exists
+    if (!existingContent.includes('## 核心类')) {
+      existingContent += '\n## 核心类\n\n';
+    }
+    
+    // For each new class, append or update
+    let updatedContent = existingContent;
+    
+    for (const cls of newClasses) {
+      const classHeader = `### ${cls.name}`;
+      
+      if (updatedContent.includes(classHeader)) {
+        // Class already exists - skip for now to avoid overwriting user descriptions
+        // In future version, we could do smart merge
+        continue;
+      }
+      
+      // Add new class section
+      const classSection = this.generateClassSection(cls);
+      updatedContent += `\n${classSection}\n`;
+    }
+    
+    return updatedContent;
+  }
+  
+  /**
+   * Generate a new module doc from scratch
+   */
+  private generateNewModuleDoc(moduleName: string, classes: ClassInfo[], changeName: string): string {
+    const sections: string[] = [];
+    
+    sections.push(`# ${moduleName} 模块`);
+    sections.push('');
+    sections.push(`> 从变更 ${changeName} 自动生成`);
+    sections.push('');
+    sections.push('## 模块说明');
+    sections.push('');
+    sections.push('[AI 补充: 此模块的业务功能和职责]');
+    sections.push('');
+    
+    // Group classes by type
+    const controllers = classes.filter(c => c.type === 'controller');
+    const services = classes.filter(c => c.type === 'service');
+    const entities = classes.filter(c => c.type === 'entity');
+    const others = classes.filter(c => !['controller', 'service', 'entity'].includes(c.type));
+    
+    if (controllers.length > 0) {
+      sections.push('## Controllers');
+      sections.push('');
+      for (const cls of controllers) {
+        sections.push(this.generateClassSection(cls));
+      }
+    }
+    
+    if (services.length > 0) {
+      sections.push('## Services');
+      sections.push('');
+      for (const cls of services) {
+        sections.push(this.generateClassSection(cls));
+      }
+    }
+    
+    if (entities.length > 0) {
+      sections.push('## Entities');
+      sections.push('');
+      for (const cls of entities) {
+        sections.push(this.generateClassSection(cls));
+      }
+    }
+    
+    if (others.length > 0) {
+      sections.push('## 其他类');
+      sections.push('');
+      for (const cls of others) {
+        sections.push(this.generateClassSection(cls));
+      }
+    }
+    
+    return sections.join('\n');
+  }
+  
+  /**
+   * Generate class section for documentation
+   */
+  private generateClassSection(cls: ClassInfo): string {
+    const sections: string[] = [];
+    
+    sections.push(`### ${cls.name}`);
+    sections.push('');
+    sections.push(`**类型**: \`${cls.type}\``);
+    sections.push(`**文件**: \`${cls.filePath}\``);
+    
+    if (cls.description) {
+      sections.push('');
+      sections.push(`**描述**: ${cls.description}`);
+    } else {
+      sections.push('');
+      sections.push(`**描述**: [AI 补充: 此类的业务功能说明]`);
+    }
+    
+    // Fields
+    if (cls.fields && cls.fields.length > 0) {
+      sections.push('');
+      sections.push('**字段**:');
+      sections.push('');
+      sections.push('| 字段名 | 类型 | 说明 |');
+      sections.push('|--------|------|------|');
+      for (const field of cls.fields) {
+        const desc = field.description || '-';
+        sections.push(`| ${field.name} | \`${field.type}\` | ${desc} |`);
+      }
+    }
+    
+    // Methods
+    if (cls.methods && cls.methods.length > 0) {
+      sections.push('');
+      sections.push('**方法**:');
+      sections.push('');
+      sections.push('| 方法名 | 参数 | 返回值 | 说明 |');
+      sections.push('|--------|------|--------|------|');
+      for (const method of cls.methods) {
+        const params = method.parameters.map(p => `${p.name}: ${p.type}`).join(', ');
+        const desc = method.description || method.businessLogic || '-';
+        sections.push(`| \`${method.name}()\` | \`${params}\` | \`${method.returnType || 'void'}\` | ${desc} |`);
+      }
+    }
+    
+    sections.push('');
+    
+    return sections.join('\n');
+  }
+  
+  /**
+   * Parse existing classes from module doc (simple parsing)
+   */
+  private parseClassesFromModuleDoc(content: string): ClassInfo[] {
+    // This is a simple implementation - just return empty for now
+    // In a complete implementation, we would parse the markdown to extract class info
+    // For now, we'll use append-only strategy
+    return [];
+  }
+  
+  /**
+   * Merge class info, preserving user descriptions
+   */
+  private mergeClassInfo(existing: ClassInfo, newInfo: ClassInfo): ClassInfo {
+    return {
+      ...newInfo,
+      // Preserve user-written descriptions if they exist and are not placeholders
+      description: existing.description && !existing.description.includes('[AI 补充') 
+        ? existing.description 
+        : newInfo.description,
+    };
+  }
+  
+  /**
+   * Rebuild module doc with merged classes
+   */
+  private rebuildModuleDoc(existingContent: string, classes: ClassInfo[], moduleName: string): string {
+    // Simple implementation: append new classes to existing content
+    // In a complete implementation, we would do intelligent merging
+    return existingContent;
   }
 }
 

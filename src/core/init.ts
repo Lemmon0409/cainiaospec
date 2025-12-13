@@ -37,6 +37,8 @@ const LETTER_MAP: Record<string, string[]> = {
   N: ['██  ██', '███ ██', '██ ███', '██  ██', '██  ██'],
   S: [' █████', '██    ', ' ████ ', '    ██', '█████ '],
   C: [' █████', '██    ', '██    ', '██    ', ' █████'],
+  A: [' ████ ', '██  ██', '██████', '██  ██', '██  ██'],
+  I: ['██████', '  ██  ', '  ██  ', '  ██  ', '██████'],
   ' ': ['  ', '  ', '  ', '  ', '  '],
 };
 
@@ -295,11 +297,11 @@ const toolSelectionWizard = createPrompt<string[], ToolWizardConfig>(
 
     if (step === 'intro') {
       const introHeadline = config.extendMode
-        ? 'Extend your OpenSpec tooling'
-        : 'Configure your OpenSpec tooling';
+        ? 'Extend your CainiaoSpec tooling'
+        : 'Configure your CainiaoSpec tooling';
       const introBody = config.extendMode
         ? 'We detected an existing setup. We will help you refresh or add integrations.'
-        : "Let's get your AI assistants connected so they understand OpenSpec.";
+        : "Let's get your AI assistants connected so they understand CainiaoSpec.";
 
       lines.push(PALETTE.white(introHeadline));
       lines.push(PALETTE.midGray(introBody));
@@ -426,18 +428,18 @@ export class InitCommand {
     // Step 1: Create directory structure
     if (!extendMode) {
       const structureSpinner = this.startSpinner(
-        'Creating OpenSpec structure...'
+        'Creating CainiaoSpec structure...'
       );
       await this.createDirectoryStructure(openspecPath);
       await this.generateFiles(openspecPath, config);
       structureSpinner.stopAndPersist({
         symbol: PALETTE.white('▌'),
-        text: PALETTE.white('OpenSpec structure created'),
+        text: PALETTE.white('CainiaoSpec structure created'),
       });
     } else {
       ora({ stream: process.stdout }).info(
         PALETTE.midGray(
-          'ℹ OpenSpec already initialized. Checking for missing files...'
+          'ℹ CainiaoSpec already initialized. Checking for missing files...'
         )
       );
       await this.createDirectoryStructure(openspecPath);
@@ -588,7 +590,7 @@ export class InitCommand {
         value: '__heading-native__',
         label: {
           primary:
-            'Natively supported providers (✔ OpenSpec custom slash commands available)',
+            'Natively supported providers (✔ CainiaoSpec custom slash commands available)',
         },
         selectable: false,
       },
@@ -733,18 +735,63 @@ export class InitCommand {
   ): Promise<void> {
     await this.writeTemplateFiles(openspecPath, config, false);
     
-    // Generate QUICK_START.md in project root (not in openspec/)
+    // Generate QUICK_START.md in project root (not in cainiaospec/)
     const projectPath = path.dirname(openspecPath);
     const quickStartPath = path.join(projectPath, 'QUICK_START.md');
     const quickStartContent = this.getQuickStartContent();
     await FileSystemUtils.writeFile(quickStartPath, quickStartContent);
+    
+    // Generate STEP_BY_STEP_DOC_PROMPT.md in project root
+    const stepByStepPath = path.join(projectPath, 'STEP_BY_STEP_DOC_PROMPT.md');
+    const stepByStepContent = this.getStepByStepPromptContent();
+    await FileSystemUtils.writeFile(stepByStepPath, stepByStepContent);
   }
 
   private async ensureTemplateFiles(
     openspecPath: string,
     config: OpenSpecConfig
   ): Promise<void> {
-    await this.writeTemplateFiles(openspecPath, config, true);
+    // When already initialized, only check for missing critical files
+    // Skip full code scan to avoid long wait times on large projects
+    const agentsPath = path.join(openspecPath, 'AGENTS.md');
+    const projectPath = path.join(openspecPath, 'project.md');
+    
+    const agentsExists = await FileSystemUtils.fileExists(agentsPath);
+    const projectExists = await FileSystemUtils.fileExists(projectPath);
+    
+    // Only regenerate if critical files are missing
+    if (agentsExists && projectExists) {
+      // All critical files exist, skip regeneration
+      return;
+    }
+    
+    // Some files missing, do a minimal regeneration without full code scan
+    console.log('Regenerating missing template files...');
+    
+    // Generate AGENTS.md if missing (doesn't need context)
+    if (!agentsExists) {
+      const agentsTemplate = TemplateManager.getTemplates({}).find(t => t.path === 'AGENTS.md');
+      if (agentsTemplate) {
+        const content = typeof agentsTemplate.content === 'function'
+          ? agentsTemplate.content({})
+          : agentsTemplate.content;
+        await FileSystemUtils.writeFile(agentsPath, content);
+      }
+    }
+    
+    // Generate project.md if missing (minimal context, no code scan)
+    if (!projectExists) {
+      const minimalContext: ProjectContext = {
+        withImplGuide: false, // Don't trigger code scan
+      };
+      const projectTemplate = TemplateManager.getTemplates(minimalContext).find(t => t.path === 'project.md');
+      if (projectTemplate) {
+        const content = typeof projectTemplate.content === 'function'
+          ? projectTemplate.content(minimalContext)
+          : projectTemplate.content;
+        await FileSystemUtils.writeFile(projectPath, content);
+      }
+    }
   }
 
   private async writeTemplateFiles(
@@ -806,7 +853,7 @@ export class InitCommand {
           '**/build/**',
           '**/.git/**',
           '**/coverage/**',
-          '**/openspec/**',
+          '**/cainiaospec/**',
         ],
       });
 
@@ -877,8 +924,8 @@ export class InitCommand {
   ): void {
     console.log(); // Empty line for spacing
     const successHeadline = extendMode
-      ? 'OpenSpec tool configuration updated!'
-      : 'OpenSpec initialized successfully!';
+      ? 'CainiaoSpec tool configuration updated!'
+      : 'CainiaoSpec initialized successfully!';
     ora().succeed(PALETTE.white(successHeadline));
 
     console.log();
@@ -922,7 +969,7 @@ export class InitCommand {
     console.log();
     console.log(
       PALETTE.midGray(
-        'Use `openspec update` to refresh shared OpenSpec instructions in the future.'
+        'Use `cainiaospec update` to refresh shared CainiaoSpec instructions in the future.'
       )
     );
 
@@ -937,7 +984,7 @@ export class InitCommand {
       );
       console.log(
         PALETTE.midGray(
-          'to ensure the new /openspec commands appear in your command palette.'
+          'to ensure the new /cainiaospec commands appear in your command palette.'
         )
       );
     }
@@ -951,72 +998,87 @@ export class InitCommand {
     console.log(chalk.yellow('⚠️  重要提示：文档中类、字段、方法的描述都是空的'));
     console.log(chalk.yellow('   静态扫描无法理解业务含义，需要 AI 补充关键描述'));
     console.log();
+        
+    // 方案 A
     console.log(chalk.cyan('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
-    console.log(chalk.bgYellow.black(' 📋 强制任务：请立即复制以下内容发给 AI 助手 '));
-    console.log(chalk.cyan('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
-    console.log();
-    console.log(chalk.bgWhite.black(' 开始复制 ▼ '));
-    console.log();
-    console.log(chalk.white('我需要你帮我完善项目文档，这是一个强制任务，必须按以下步骤完成：'));
-    console.log();
-    console.log(chalk.white('【第 1 步】读取并理解项目结构'));
-    console.log(chalk.gray('  ├─ 打开并仔细阅读 openspec/project.md'));
-    console.log(chalk.gray('  ├─ 打开并仔细阅读 openspec/modules/*.md 中的每个文件'));
-    console.log(chalk.gray('  └─ 理解项目的整体架构和模块划分'));
-    console.log();
-    console.log(chalk.white('【第 2 步】查看需要补充的内容清单'));
-    console.log(chalk.gray('  └─ 打开 openspec/ai-tasks.md，了解文档结构'));
-    console.log();
-    console.log(chalk.bgRed.white(' 【第 3 步】补充关键类的详细描述（核心任务，不可跳过）'));
-    console.log(chalk.yellow('  ├─ 优先级 1：Controller 类（所有 @RestController、@Controller）'));
-    console.log(chalk.yellow('  │   • 说明这个 Controller 负责哪些业务功能'));
-    console.log(chalk.yellow('  │   • 说明主要的 API 端点用途'));
-    console.log(chalk.yellow('  │   • 说明服务于哪些业务场景'));
-    console.log(chalk.yellow('  ├─ 优先级 2：核心 Service 类（所有 @Service）'));
-    console.log(chalk.yellow('  │   • 说明这个 Service 实现什么业务逻辑'));
-    console.log(chalk.yellow('  │   • 说明核心方法的业务功能'));
-    console.log(chalk.yellow('  │   • 说明在业务流程中的位置'));
-    console.log(chalk.yellow('  ├─ 优先级 3：重要 DTO 类（请求/响应对象）'));
-    console.log(chalk.yellow('  │   • 说明这个 DTO 在哪个 API 中使用'));
-    console.log(chalk.yellow('  │   • 为关键字段添加业务含义（不是所有字段）'));
-    console.log(chalk.yellow('  │   • 临时变量、内部变量可标注"内部使用"或保持为空'));
-    console.log(chalk.yellow('  └─ 其他辅助类：'));
-    console.log(chalk.gray('      • 工具类、配置类、常量类可以简单标注用途'));
-    console.log(chalk.gray('      • 不重要的内部类可以保持描述为空'));
-    console.log();
-    console.log(chalk.white('【第 4 步】补充业务场景（仅核心模块）'));
-    console.log(chalk.gray('  ├─ 在主要模块文档开头的【业务场景】章节'));
-    console.log(chalk.gray('  └─ 说明该模块解决什么业务问题、服务于哪些业务场景'));
-    console.log();
-    console.log(chalk.white('【第 5 步】补充核心业务流程（仅核心模块）'));
-    console.log(chalk.gray('  ├─ 在主要模块文档的【核心业务流程】章节'));
-    console.log(chalk.gray('  └─ 绘制 1-2 个最重要的业务流程调用链'));
-    console.log();
-    console.log(chalk.white('【第 6 步】清理'));
-    console.log(chalk.gray('  └─ 完成后删除 openspec/ai-tasks.md 文件'));
-    console.log();
-    console.log(chalk.bgCyan.black(' ⚠️  补充原则（重要）'));
-    console.log(chalk.cyan('  • 聚焦关键：优先补充 Controller、Service、重要 DTO'));
-    console.log(chalk.cyan('  • 允许空描述：辅助类、临时变量、内部字段可以为空'));
-    console.log(chalk.cyan('  • 质量优先：宁可少而精，不要为了填充而编造'));
-    console.log(chalk.cyan('  • 基于代码：所有描述必须基于实际代码逻辑'));
-    console.log();
-   console.log(chalk.bgGreen.black(' ✅ 验收标准（核心类必须满足）'));
-    console.log(chalk.green('  • 所有 Controller 类都有业务功能说明'));
-    console.log(chalk.green('  • 所有 Service 类都有业务逻辑说明'));
-    console.log(chalk.green('  • 重要 DTO 的关键字段有业务含义说明'));
-    console.log(chalk.green('  • 核心模块有业务场景和流程说明'));
-    console.log(chalk.gray('  • 辅助类、工具类的描述可以简单或为空'));
-    console.log();
-    console.log(chalk.bgWhite.black(' 复制结束 ▲ '));
-    console.log();
+    console.log(chalk.bgGreen.black(' 方案 A：分步补充（推荐，适合大模块） '));
     console.log(chalk.cyan('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
     console.log();
-    console.log(chalk.magenta('💡 使用说明：'));
-    console.log(chalk.white('  1️⃣  复制上面框内的全部内容（从"开始复制"到"复制结束"）'));
-    console.log(chalk.white('  2️⃣  粘贴给 AI 助手，让 AI 按照步骤完善文档'));
-    console.log(chalk.white('  3️⃣  AI 会补充所有关键类、字段、方法的描述'));
-    console.log(chalk.white('  4️⃣  完成后即可开始开发新功能'));
+    console.log(chalk.green('一次只处理一个小任务，避免 AI 迷失焦点。每个模块按以下 4 步完成：'));
+    console.log();
+    console.log(chalk.white('█ 步骤 1: 补充 README.md'));
+    console.log(chalk.gray('  复制以下内容发给 AI：'));
+    console.log(chalk.white('  ────────────────────────────────────────'));
+    console.log(chalk.yellow('  请打开 cainiaospec/modules/[模块名]/README.md'));
+    console.log(chalk.yellow('  补充以下章节：'));
+    console.log(chalk.yellow('  1. 🎯 业务场景 - 核心价值、服务对象、主要场景'));
+    console.log(chalk.yellow('  2. 🔄 核心业务流程 - 用 Mermaid 绘制 1-2 个流程图'));
+    console.log(chalk.yellow('  3. 📜 核心业务规则 - 判断条件、处理逻辑'));
+    console.log(chalk.yellow('  4. 🔀 状态流转 - 用 Mermaid 绘制状态图'));
+    console.log(chalk.yellow('  5. ❓ 常见问题 FAQ - 添加 3-5 个问题'));
+    console.log(chalk.yellow('  完成后告诉我："✅ README 已补充"'));
+    console.log(chalk.white('  ────────────────────────────────────────'));
+    console.log();
+    console.log(chalk.white('█ 步骤 2: 补充 controllers.md'));
+    console.log(chalk.gray('  AI 完成步骤 1 后，复制以下内容：'));
+    console.log(chalk.white('  ────────────────────────────────────────'));
+    console.log(chalk.yellow('  请打开 cainiaospec/modules/[模块名]/controllers.md'));
+    console.log(chalk.yellow('  为每个 Controller 补充：'));
+    console.log(chalk.yellow('  1. 描述 - 一句话说明负责什么'));
+    console.log(chalk.yellow('  2. 业务功能 - 列出 2-3 个主要功能'));
+    console.log(chalk.yellow('  3. 服务场景 - 哪些用户/系统使用'));
+    console.log(chalk.yellow('  4. API 端点表 - 每个方法的用途和业务逻辑'));
+    console.log(chalk.yellow('  完成后告诉我："✅ Controllers 已补充"'));
+    console.log(chalk.white('  ────────────────────────────────────────'));
+    console.log();
+    console.log(chalk.white('█ 步骤 3: 补充 services.md'));
+    console.log(chalk.gray('  AI 完成步骤 2 后，复制以下内容：'));
+    console.log(chalk.white('  ────────────────────────────────────────'));
+    console.log(chalk.yellow('  请打开 cainiaospec/modules/[模块名]/services.md'));
+    console.log(chalk.yellow('  为每个 Service 的核心方法补充：'));
+    console.log(chalk.yellow('  1. 业务描述 - 这个方法做什么'));
+    console.log(chalk.yellow('  2. 执行步骤 - 1.xxx 2.xxx 3.xxx'));
+    console.log(chalk.yellow('  完成后告诉我："✅ Services 已补充"'));
+    console.log(chalk.white('  ────────────────────────────────────────'));
+    console.log();
+    console.log(chalk.white('█ 步骤 4: 补充 models.md'));
+    console.log(chalk.gray('  AI 完成步骤 3 后，复制以下内容：'));
+    console.log(chalk.white('  ────────────────────────────────────────'));
+    console.log(chalk.yellow('  请打开 cainiaospec/modules/[模块名]/models.md'));
+    console.log(chalk.yellow('  为重要 DTO/Entity 的关键字段补充：'));
+    console.log(chalk.yellow('  1. 业务含义 - 这个字段代表什么'));
+    console.log(chalk.yellow('  2. 示例值 - 如 "ORD20250312001234"'));
+    console.log(chalk.yellow('  3. 单位/取值 - 如 "单位:秒"'));
+    console.log(chalk.yellow('  完成后告诉我："✅ Models 已补充"'));
+    console.log(chalk.white('  ────────────────────────────────────────'));
+    console.log();
+    console.log(chalk.gray('📄 完整分步提示词：查看 STEP_BY_STEP_DOC_PROMPT.md'));
+    console.log();
+        
+    // 方案 B
+    console.log(chalk.cyan('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
+    console.log(chalk.bgBlue.white(' 方案 B：一次性补充（适合小模块，<50个类） '));
+    console.log(chalk.cyan('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
+    console.log();
+    console.log(chalk.blue('复制以下内容发给 AI：'));
+    console.log(chalk.white('────────────────────────────────────────'));
+    console.log(chalk.yellow('请打开 cainiaospec/modules/[模块名]/ 目录下的所有文件：'));
+    console.log(chalk.yellow('- README.md'));
+    console.log(chalk.yellow('- controllers.md'));
+    console.log(chalk.yellow('- services.md'));
+    console.log(chalk.yellow('- models.md'));
+    console.log();
+    console.log(chalk.yellow('为所有空白的描述补充内容，包括：'));
+    console.log(chalk.yellow('1. 业务场景、核心流程（Mermaid）、业务规则、状态流转'));
+    console.log(chalk.yellow('2. 每个 Controller 的描述和 API 说明'));
+    console.log(chalk.yellow('3. 每个 Service 方法的业务描述'));
+    console.log(chalk.yellow('4. 重要 DTO 字段的业务含义'));
+    console.log(chalk.yellow('5. FAQ 常见问题'));
+    console.log();
+    console.log(chalk.yellow('完成后告诉我："✅ 模块文档已补充完成"'));
+    console.log(chalk.white('────────────────────────────────────────'));
+    console.log();
+    console.log(chalk.cyan('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
     console.log();
     console.log(
       PALETTE.darkGray(
@@ -1034,12 +1096,12 @@ export class InitCommand {
     );
     console.log(
       PALETTE.lightGray(
-        '   请基于 openspec/project.md 和模块文档理解项目结构，'
+        '   请基于 cainiaospec/project.md 和模块文档理解项目结构，'
       )
     );
     console.log(
       PALETTE.lightGray(
-        '   创建详细的 OpenSpec 变更提案，'
+        '   创建详细的 CainiaoSpec 变更提案，'
       )
     );
     console.log(
@@ -1048,10 +1110,10 @@ export class InitCommand {
       )
     );
     console.log();
-    console.log(PALETTE.white('了解 OpenSpec 工作流:'));
+    console.log(PALETTE.white('了解 CainiaoSpec 工作流:'));
     console.log(
       PALETTE.lightGray(
-        '   "请解释 openspec/AGENTS.md 中的工作流程，'
+        '   "请解释 cainiaospec/AGENTS.md 中的工作流程，'
       )
     );
     console.log(
@@ -1079,19 +1141,19 @@ export class InitCommand {
     console.log(chalk.cyan('💡 下次打开项目时的快速开始：'));
     console.log();
     console.log(chalk.white('场景 1：继续未完成的工作'));
-    console.log(chalk.gray('  openspec list              # 查看所有活动中的变更'));
-    console.log(chalk.gray('  openspec show [change-id]  # 查看具体变更详情'));
+    console.log(chalk.gray('  cainiaospec list              # 查看所有活动中的变更'));
+    console.log(chalk.gray('  cainiaospec show [change-id]  # 查看具体变更详情'));
     console.log();
     console.log(chalk.white('场景 2：实现新功能'));
-    console.log(chalk.gray('  告诉 AI："我想实现 [功能描述]，请创建 OpenSpec 提案"'));
+    console.log(chalk.gray('  告诉 AI："我想实现 [功能描述]，请创建 CainiaoSpec 提案"'));
     console.log(chalk.gray('  AI 会创建：proposal.md + tasks.md'));
     console.log();
     console.log(chalk.white('场景 3：实施提案'));
-    console.log(chalk.gray('  告诉 AI："请按照 openspec/changes/[change-id]/tasks.md 实施"'));
+    console.log(chalk.gray('  告诉 AI："请按照 cainiaospec/changes/[change-id]/tasks.md 实施"'));
     console.log(chalk.gray('  AI 会严格遵循提案中的规范和逻辑'));
     console.log();
     console.log(chalk.white('场景 4：归档已完成的变更'));
-    console.log(chalk.gray('  openspec archive [change-id]  # 功能部署后归档'));
+    console.log(chalk.gray('  cainiaospec archive [change-id]  # 功能部署后归档'));
     console.log();
     console.log(chalk.magenta('📚 完整的快速开始指南：'));
     console.log(chalk.gray('  查看 QUICK_START.md（已保存在项目根目录）'));
@@ -1117,7 +1179,7 @@ export class InitCommand {
 
   private renderBanner(_extendMode: boolean): void {
     const rows = ['', '', '', '', ''];
-    for (const char of 'OPENSPEC') {
+    for (const char of 'CAINIAO') {
       const glyph = LETTER_MAP[char] ?? LETTER_MAP[' '];
       for (let i = 0; i < rows.length; i += 1) {
         rows[i] += `${glyph[i]}  `;
@@ -1137,7 +1199,7 @@ export class InitCommand {
       console.log(rowStyles[index](row.replace(/\s+$/u, '')));
     });
     console.log();
-    console.log(PALETTE.white('Welcome to OpenSpec!'));
+    console.log(PALETTE.white('Welcome to CainiaoSpec!'));
     console.log();
   }
 
@@ -1167,9 +1229,9 @@ export class InitCommand {
 
 \`\`\`bash
 # 1. 查看生成的文档
-cat openspec/project.md
-cat openspec/modules/*.md
-cat openspec/ai-tasks.md
+cat cainiaospec/project.md
+cat cainiaospec/modules/*.md
+cat cainiaospec/ai-tasks.md
 
 # 2. 复制初始化时显示的"开始复制"到"复制结束"之间的内容
 # 3. 粘贴给 AI 助手，让 AI 按照步骤完善文档
@@ -1190,14 +1252,14 @@ AI 会：
 \`\`\`bash
 # 告诉 AI：
 "我想实现 [具体功能描述]。
-请基于 openspec/project.md 和模块文档理解项目结构，
-创建详细的 OpenSpec 变更提案，
+请基于 cainiaospec/project.md 和模块文档理解项目结构，
+创建详细的 CainiaoSpec 变更提案，
 说明需要修改哪些文件、调用哪些类、具体实现逻辑"
 \`\`\`
 
 AI 会创建：
 \`\`\`
-openspec/changes/[change-id]/
+cainiaospec/changes/[change-id]/
   ├── proposal.md   # 提案：为什么做、做什么、影响范围
   ├── tasks.md      # 任务清单：如何实现（包含完整的 API 规范、调用链）
   └── design.md     # （可选）技术设计
@@ -1211,7 +1273,7 @@ openspec/changes/[change-id]/
 
 \`\`\`bash
 # 告诉 AI：
-"请按照 openspec/changes/[change-id]/tasks.md 实施这个提案"
+"请按照 cainiaospec/changes/[change-id]/tasks.md 实施这个提案"
 \`\`\`
 
 AI 会：
@@ -1227,16 +1289,16 @@ AI 会：
 
 \`\`\`bash
 # 查看所有活动中的变更
-openspec list
+cainiaospec list
 
 # 查看所有规范
-openspec list --specs
+cainiaospec list --specs
 
 # 查看特定变更的详情
-openspec show [change-id]
+cainiaospec show [change-id]
 
 # 验证变更
-openspec validate [change-id] --strict
+cainiaospec validate [change-id] --strict
 \`\`\`
 
 ---
@@ -1247,10 +1309,10 @@ openspec validate [change-id] --strict
 
 \`\`\`bash
 # 归档变更
-openspec archive [change-id]
+cainiaospec archive [change-id]
 
 # 或者非交互式归档
-openspec archive [change-id] --yes
+cainiaospec archive [change-id] --yes
 \`\`\`
 
 ---
@@ -1259,11 +1321,11 @@ openspec archive [change-id] --yes
 
 | 命令 | 说明 |
 |------|------|
-| \`openspec list\` | 查看所有活动中的变更 |
-| \`openspec list --specs\` | 查看所有规范 |
-| \`openspec show [item]\` | 查看变更或规范详情 |
-| \`openspec validate [item]\` | 验证变更或规范 |
-| \`openspec archive [change-id]\` | 归档已完成的变更 |
+| \`cainiaospec list\` | 查看所有活动中的变更 |
+| \`cainiaospec list --specs\` | 查看所有规范 |
+| \`cainiaospec show [item]\` | 查看变更或规范详情 |
+| \`cainiaospec validate [item]\` | 验证变更或规范 |
+| \`cainiaospec archive [change-id]\` | 归档已完成的变更 |
 
 ---
 
@@ -1283,10 +1345,10 @@ openspec archive [change-id] --yes
    └─ "按照 tasks.md 实施" → AI 严格遵循规范实现
 
 5. 验证
-   └─ openspec validate [change-id] --strict
+   └─ cainiaospec validate [change-id] --strict
 
 6. 部署后归档
-   └─ openspec archive [change-id]
+   └─ cainiaospec archive [change-id]
 \`\`\`
 
 ---
@@ -1338,20 +1400,20 @@ openspec archive [change-id] --yes
 
 \`\`\`bash
 # 1. 查看状态
-openspec list
+cainiaospec list
 
 # 2. 如果有未完成的变更
-openspec show [change-id]
+cainiaospec show [change-id]
 
 # 3. 继续实施
-# 告诉 AI："请继续实施 openspec/changes/[change-id] 的提案"
+# 告诉 AI："请继续实施 cainiaospec/changes/[change-id] 的提案"
 \`\`\`
 
 ### Q2: 如何知道文档是否已经完善？
 
 \`\`\`bash
 # 检查 ai-tasks.md 是否存在
-ls openspec/ai-tasks.md
+ls cainiaospec/ai-tasks.md
 
 # 如果存在，说明还没完善
 # 如果不存在，说明已经完善
@@ -1361,8 +1423,8 @@ ls openspec/ai-tasks.md
 
 \`\`\`bash
 # 直接修改文件：
-# - openspec/changes/[change-id]/proposal.md
-# - openspec/changes/[change-id]/tasks.md
+# - cainiaospec/changes/[change-id]/proposal.md
+# - cainiaospec/changes/[change-id]/tasks.md
 
 # 然后告诉 AI："提案已更新，请重新实施"
 \`\`\`
@@ -1371,24 +1433,285 @@ ls openspec/ai-tasks.md
 
 \`\`\`bash
 # 主文档
-cat openspec/project.md
+cat cainiaospec/project.md
 
 # 模块文档
-cat openspec/modules/*.md
+cat cainiaospec/modules/*.md
 
 # 工作流指南
-cat openspec/AGENTS.md
+cat cainiaospec/AGENTS.md
 \`\`\`
 
 ---
 
 ## 📚 更多信息
 
-- [完整的 AGENTS.md](openspec/AGENTS.md) - AI 工作流指南
+- [完整的 AGENTS.md](cainiaospec/AGENTS.md) - AI 工作流指南
 
 ---
 
 *提示：如果忘记了工作流程，随时可以查看这个文件！*
+`;
+  }
+
+  private getStepByStepPromptContent(): string {
+    return `# 分步补充文档提示词
+
+> 当模块文档过大时，使用分步提示词让 AI 逐步完成，避免遗漏
+
+---
+
+## 🎯 使用方法
+
+**不要一次性让 AI 补充整个文档！**
+
+按以下顺序，每次只发一个提示词给 AI，等 AI 完成后再发下一个。
+
+---
+
+## 第 1 步：补充业务场景
+
+\`\`\`
+请打开 cainiaospec/modules/[模块名].md 文件。
+
+只做这一件事：补充【🎯 业务场景】章节。
+
+要求：
+1. 阅读该模块的 Controller 和 Service 代码
+2. 理解这个模块解决什么业务问题
+3. 填写：
+   - 核心价值: [该模块解决的核心业务问题]
+   - 服务对象: [哪些用户群体/系统使用这个模块]
+   - 场景1: [具体业务场景]
+   - 场景2: [具体业务场景]
+
+完成后告诉我："✅ 业务场景已补充"
+\`\`\`
+
+---
+
+## 第 2 步：补充核心业务流程
+
+\`\`\`
+继续编辑 cainiaospec/modules/[模块名].md 文件。
+
+只做这一件事：补充【🔄 核心业务流程】章节。
+
+要求：
+1. 找出该模块最重要的 1-2 个业务流程
+2. 阅读相关 Controller 和 Service 代码
+3. 用 Mermaid sequenceDiagram 绘制流程图
+
+示例格式：
+### 流程1: 订单创建流程
+
+\`\`\`mermaid
+sequenceDiagram
+    participant User as 用户
+    participant Controller as OrderController
+    participant Service as OrderService
+    participant DB as 数据库
+    
+    User->>Controller: POST /order/create
+    Controller->>Service: create(req)
+    Service->>Service: validate() 校验
+    Service->>DB: save() 保存
+    Service-->>Controller: 返回订单号
+    Controller-->>User: 创建成功
+\`\`\`
+
+完成后告诉我："✅ 核心业务流程已补充"
+\`\`\`
+
+---
+
+## 第 3 步：补充业务规则
+
+\`\`\`
+继续编辑 cainiaospec/modules/[模块名].md 文件。
+
+只做这一件事：补充【📜 核心业务规则】章节。
+
+要求：
+1. 阅读 Service 代码中的校验逻辑和业务判断
+2. 提取 3-5 个核心业务规则
+3. 每个规则说明：
+   - 判断条件: [什么情况下触发]
+   - 处理逻辑: [如何处理]
+   - 异常情况: [边界场景如何处理]
+
+完成后告诉我："✅ 核心业务规则已补充"
+\`\`\`
+
+---
+
+## 第 4 步：补充状态流转
+
+\`\`\`
+继续编辑 cainiaospec/modules/[模块名].md 文件。
+
+只做这一件事：补充【🔀 状态流转】章节。
+
+要求：
+1. 找出该模块的核心实体（如 Order、Task）
+2. 找出状态枚举类
+3. 用 Mermaid stateDiagram 绘制状态流转图
+4. 列出每个状态可执行的操作
+
+完成后告诉我："✅ 状态流转已补充"
+\`\`\`
+
+---
+
+## 第 5 步：补充 Controller 描述
+
+\`\`\`
+继续编辑 cainiaospec/modules/[模块名].md 文件。
+
+只做这一件事：为所有 Controller 补充描述。
+
+对于每个 Controller：
+1. 阅读代码，理解它负责什么业务
+2. 补充【描述】：一句话说明业务功能
+3. 补充【业务功能】：列出 2-3 个主要功能
+4. 补充【服务场景】：说明谁使用这些 API
+
+对于每个 Controller 方法：
+1. 补充【用途】：这个接口做什么
+2. 补充【重要业务逻辑】：调用了哪些 Service，有什么关键检查
+
+一个一个 Controller 处理，每处理完一个报告一次。
+
+完成后告诉我："✅ Controller 描述已补充"
+\`\`\`
+
+---
+
+## 第 6 步：补充 Service 方法描述
+
+\`\`\`
+继续编辑 cainiaospec/modules/[模块名].md 文件。
+
+只做这一件事：为所有 Service 的核心方法补充描述。
+
+只处理 public 方法，对于每个方法：
+1. 阅读代码逻辑
+2. 补充业务描述，格式如下：
+
+| 方法 | 参数 | 返回类型 | 业务描述 |
+|------|------|----------|----------|
+| create() | req | String | **订单创建**<br>1. 校验时间<br>2. 检查重复<br>3. 保存订单 |
+
+重点：
+- 说明这个方法做什么（业务目的）
+- 列出关键步骤（1. 2. 3.）
+- 标注重要的业务规则
+
+一个一个 Service 处理，每处理完一个报告一次。
+
+完成后告诉我："✅ Service 方法描述已补充"
+\`\`\`
+
+---
+
+## 第 7 步：补充 DTO 字段描述
+
+\`\`\`
+继续编辑 cainiaospec/modules/[模块名].md 文件。
+
+只做这一件事：为重要 DTO 的关键字段补充描述。
+
+优先处理：
+- 请求参数 DTO（XxxReq）
+- 响应结果 DTO（XxxVO、XxxResp）
+- 核心实体（Entity）
+
+对于每个重要字段：
+1. 补充业务含义
+2. 补充示例值
+3. 如果有单位，标注单位
+
+格式：
+| 字段 | 类型 | 业务含义 | 示例/取值 |
+|------|------|----------|----------|
+| code | String | 订单编号 | "ORD20250312001234" |
+| duration | Long | 行程时长 | 单位：秒，1800=30分钟 |
+
+完成后告诉我："✅ DTO 字段描述已补充"
+\`\`\`
+
+---
+
+## 第 8 步：补充 FAQ
+
+\`\`\`
+继续编辑 cainiaospec/modules/[模块名].md 文件。
+
+只做这一件事：补充【❓ 常见问题 FAQ】章节。
+
+根据你对代码的理解，添加 3-5 个开发者可能遇到的问题：
+
+格式：
+### Q1: [问题]
+A: [答案]
+
+### Q2: [问题]
+A: [答案]
+
+问题类型建议：
+- 状态判断类：如"如何判断订单能否取消？"
+- 规则解释类：如"什么情况下会触发重复订单检查？"
+- 异常处理类：如"创建订单失败的常见原因？"
+
+完成后告诉我："✅ FAQ 已补充"
+\`\`\`
+
+---
+
+## 第 9 步：清理和检查
+
+\`\`\`
+请检查 cainiaospec/modules/[模块名].md 文件。
+
+1. 删除所有【请 AI 补充】的占位符
+2. 删除所有示例模板文字
+3. 确保所有章节都有实际内容
+4. 如果有遗漏的描述（显示为 \`-\`），补充完整
+
+检查清单：
+- [ ] 业务场景有实际内容
+- [ ] 核心业务流程有 Mermaid 图
+- [ ] 业务规则有具体内容
+- [ ] 所有 Controller 有描述
+- [ ] 所有 Controller 方法有用途说明
+- [ ] 核心 Service 方法有业务描述
+- [ ] 重要 DTO 字段有说明
+- [ ] FAQ 有 3-5 个问题
+
+完成后告诉我："✅ 文档检查完成"
+\`\`\`
+
+---
+
+## 💡 使用技巧
+
+1. **一次一步**：每次只发一个提示词，等 AI 完成后再发下一个
+2. **替换模块名**：把 \`[模块名]\` 替换成实际的模块文件名
+3. **大模块分批**：如果模块有很多 Controller，可以分批处理
+4. **及时保存**：每完成一步，确认 AI 已保存文件
+
+## 📋 快速清单
+
+按顺序发送：
+1. ✅ 业务场景
+2. ✅ 核心业务流程
+3. ✅ 业务规则
+4. ✅ 状态流转
+5. ✅ Controller 描述
+6. ✅ Service 方法描述
+7. ✅ DTO 字段描述
+8. ✅ FAQ
+9. ✅ 清理和检查
 `;
   }
 }
