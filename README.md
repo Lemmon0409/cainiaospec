@@ -1,0 +1,2 @@
+# cainiaospec
+复杂版的openspec生成的文件更复杂 ai写代码会更清醒但是初始化比较慢
