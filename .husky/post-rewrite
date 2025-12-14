@@ -1,4 +1,0 @@
-#!/usr/bin/env sh
-
-# AI Code Stats - rebase/amend后清除缓存
-echo "CLEAR_CACHE_ON_REWRITE_$(date +%s)" > .git/ai-code-stats-rewrite.tmp

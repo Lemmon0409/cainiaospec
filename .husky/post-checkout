@@ -1,4 +1,0 @@
-#!/usr/bin/env sh
-
-# AI Code Stats - 分支切换后清除缓存
-echo "CLEAR_CACHE_ON_CHECKOUT_$(date +%s)" > .git/ai-code-stats-checkout.tmp
