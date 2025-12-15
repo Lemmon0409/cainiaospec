@@ -218,6 +218,11 @@ function generateProjectStructureSection(structure: ProjectStructure): string {
   sections.push(`|---------|------|------|------|----------|`);
 
   for (const module of structure.modules) {
+    // 跳过 starter 模块
+    if (module.name.toLowerCase().includes('starter')) {
+      continue;
+    }
+    
     const typeLabels = {
       api: 'API层',
       biz: '业务层',
@@ -248,6 +253,10 @@ function generateProjectStructureSection(structure: ProjectStructure): string {
     }
 
     for (const [from, tos] of depTree) {
+      // 跳过 starter 模块
+      if (from.toLowerCase().includes('starter')) {
+        continue;
+      }
       sections.push(`${from}`);
       for (const to of tos) {
         sections.push(`  └→ ${to}`);
@@ -945,6 +954,11 @@ ${context.techStack?.length ? context.techStack.map(tech => `- ${tech}`).join('\
     sections.push(`本项目按模块拆分了详细文档，每个模块进一步拆分为多个小文件，方便 AI 处理：\n`);
     
     for (const module of context.projectStructure.modules) {
+      // 跳过 starter 模块
+      if (module.name.toLowerCase().includes('starter')) {
+        continue;
+      }
+      
       const moduleClasses = (context.allClasses || []).filter(cls => 
         cls.filePath.includes(module.path)
       );
@@ -1029,7 +1043,12 @@ function generateModuleDoc(moduleName: string, classes: ClassInfo[], context: Pr
   
   // Core business flows placeholder - ENHANCED with Mermaid examples
   sections.push(`## 🔄 核心业务流程\n`);
-  sections.push(`**[请 AI 补充: 描述关键业务流程的执行顺序和逻辑，使用 Mermaid 绘制流程图]**\n`);
+  sections.push(`**[请 AI 补充: 为每个主要业务场景绘制 Mermaid 流程图，建议 3-5 个]**\n`);
+  sections.push(`要求：`);
+  sections.push(`- 每个核心业务场景都需要一个流程图`);
+  sections.push(`- 使用 sequenceDiagram 展示调用链`);
+  sections.push(`- 标注关键的校验点、分支逻辑、异常处理`);
+  sections.push(`- 包含主要参与者：Controller、Service、外部系统、数据库等\n`);
   sections.push(`示例结构（请替换为实际内容）：\n`);
   sections.push(`### 流程1: [流程名称，如"订单创建流程"]\n`);
   sections.push(`\`\`\`mermaid`);
@@ -1047,6 +1066,12 @@ function generateModuleDoc(moduleName: string, classes: ClassInfo[], context: Pr
   sections.push(`    Controller-->>User: 响应成功`);
   sections.push(`\`\`\`\n`);
   sections.push(`### 流程2: [流程名称]\n`);
+  sections.push(`[类似的流程图...]\n`);
+  sections.push(`### 流程3: [流程名称]\n`);
+  sections.push(`[类似的流程图...]\n`);
+  sections.push(`### 流程4: [流程名称]\n`);
+  sections.push(`[类似的流程图...]\n`);
+  sections.push(`### 流程5: [流程名称]\n`);
   sections.push(`[类似的流程图...]\n`);
   
   // Business Rules placeholder - NEW section
@@ -1123,12 +1148,12 @@ function generateModuleDoc(moduleName: string, classes: ClassInfo[], context: Pr
       // Methods with enhanced format for Controllers
       if (cls.methods.length > 0) {
         sections.push(`**核心 API 端点：**\n`);
-        sections.push(`| 端点 | 用途 | 重要业务逻辑 |`);
-        sections.push(`|------|------|-------------|`);
+        sections.push(`| 端点 | 用途 | 参数格式要求 | 常见错误码 |`);
+        sections.push(`|------|------|--------------|------------|`);
         
         for (const method of cls.methods) {
           const desc = method.description || method.businessLogic || '**[请 AI 补充]**';
-          sections.push(`| \`${method.name}()\` | ${desc} | [请说明关键检查和调用链] |`);
+          sections.push(`| \`${method.name}()\` | ${desc} | **[补充日期格式/枚举值/必填项]** | **[补充错误码]** |`);
         }
         sections.push('');
       }
@@ -1159,15 +1184,15 @@ function generateModuleDoc(moduleName: string, classes: ClassInfo[], context: Pr
       // Methods with enhanced format for Services
       if (cls.methods.length > 0) {
         sections.push(`\n**核心方法说明：**\n`);
-        sections.push(`| 方法 | 参数 | 返回类型 | 业务描述 |`);
-        sections.push(`|------|------|----------|----------|`);
+        sections.push(`| 方法 | 参数 | 返回类型 | 业务描述 | 可能异常 |`);
+        sections.push(`|------|------|----------|----------|----------|`);
         
         for (const method of cls.methods) {
           const params = method.parameters.length > 0 
             ? method.parameters.map(p => `${p.name}: ${p.type}`).join(', ')
             : '-';
           const desc = method.description || method.businessLogic || '**[请 AI 补充]**';
-          sections.push(`| \`${method.name}()\` | \`${params}\` | \`${method.returnType || 'void'}\` | ${desc} |`);
+          sections.push(`| \`${method.name}()\` | \`${params}\` | \`${method.returnType || 'void'}\` | ${desc} | **[补充异常]** |`);
         }
         sections.push('');
       }
@@ -1218,21 +1243,21 @@ function generateModuleDoc(moduleName: string, classes: ClassInfo[], context: Pr
         sections.push(`\n**字段说明：**\n`);
         
         if (type === 'entity') {
-          sections.push(`| 字段 | 类型 | 业务含义 | 示例/取值范围 |`);
-          sections.push(`|------|------|----------|--------------|`);
+          sections.push(`| 字段 | 类型 | 必填 | 业务含义 | 格式/取值 | 示例 |`);
+          sections.push(`|------|------|------|----------|----------|------|`);
           
           for (const field of cls.fields) {
             const desc = field.description || '[请 AI 补充]';
-            sections.push(`| \`${field.name}\` | \`${field.type}\` | ${desc} | [示例值] |`);
+            sections.push(`| \`${field.name}\` | \`${field.type}\` | [是/否] | ${desc} | **[格式要求]** | **[示例值]** |`);
           }
         } else {
-          sections.push(`| 字段 | 类型 | 业务含义 | 是否必填 |`);
-          sections.push(`|------|------|----------|----------|`);
+          sections.push(`| 字段 | 类型 | 必填 | 业务含义 | 格式/取值 | 示例 |`);
+          sections.push(`|------|------|------|----------|----------|------|`);
           
           for (const field of cls.fields) {
             const desc = field.description || '[请 AI 补充]';
             const required = field.optional ? '否' : '是';
-            sections.push(`| \`${field.name}\` | \`${field.type}\` | ${desc} | ${required} |`);
+            sections.push(`| \`${field.name}\` | \`${field.type}\` | ${required} | ${desc} | **[格式要求]** | **[示例值]** |`);
           }
         }
         sections.push('');
@@ -1293,6 +1318,15 @@ function generateSplitModuleDocs(moduleName: string, classes: ClassInfo[], conte
   const docs: ModularDoc[] = [];
   const moduleDir = `modules/${moduleName}`;
   
+  // 完全跳过 starter 模块，不生成任何文档
+  const skipModulePatterns = ['starter'];
+  const shouldSkip = skipModulePatterns.some(pattern => 
+    moduleName.toLowerCase().includes(pattern)
+  );
+  if (shouldSkip) {
+    return docs; // 返回空数组，不生成文档
+  }
+  
   const controllers = classes.filter(c => c.type === 'controller');
   const services = classes.filter(c => c.type === 'service');
   const entities = classes.filter(c => c.type === 'entity');
@@ -1352,10 +1386,50 @@ function generateModuleReadme(
 ): string {
   const sections: string[] = [];
   
+  // 判断是否是基础设施模块（配置类、工具类等，不需要详细的业务文档）
+  const infraModulePatterns = [
+    'config', 'configuration', 'common', 'utils', 'util',
+    'core', 'base', 'framework', 'infrastructure', 'bootstrap',
+    'test', 'testutils', 'mock'
+  ];
+  const isInfraModule = infraModulePatterns.some(pattern => 
+    moduleName.toLowerCase().includes(pattern)
+  );
+  
   sections.push(`# 模块: ${moduleName}\n`);
   sections.push(`[← 返回主文档](../../project.md)\n`);
   sections.push(`---\n`);
   
+  // 基础设施模块：生成简化版文档
+  if (isInfraModule) {
+    sections.push(`> **模块类型**: 基础设施/配置模块（无需详细业务文档）\n`);
+    
+    sections.push(`## 📝 模块说明\n`);
+    sections.push(`**[简要说明该模块的用途]**\n`);
+    
+    sections.push(`## 📦 主要类\n`);
+    sections.push(`| 类名 | 类型 | 说明 |`);
+    sections.push(`|------|------|------|`);
+    for (const cls of allClasses.slice(0, 20)) {
+      const typeLabel = cls.type === 'controller' ? 'Controller' : 
+                        cls.type === 'service' ? 'Service' :
+                        cls.type === 'entity' ? 'Entity' :
+                        cls.type === 'dto' ? 'DTO' :
+                        cls.type === 'repository' ? 'Repository' : '其他';
+      sections.push(`| \`${cls.name}\` | ${typeLabel} | ${cls.description || '[说明]'} |`);
+    }
+    if (allClasses.length > 20) {
+      sections.push(`| ... | ... | 还有 ${allClasses.length - 20} 个类 |`);
+    }
+    sections.push(`\n`);
+    
+    sections.push(`## 📊 模块统计\n`);
+    sections.push(`- **总类数**: ${allClasses.length} 个\n`);
+    
+    return sections.join('\n');
+  }
+  
+  // 业务模块：生成完整版文档
   // Navigation to sub-documents
   sections.push(`## 📂 文档索引\n`);
   sections.push(`本模块文档已拆分，AI 处理时请按需读取：\n`);
@@ -1375,16 +1449,34 @@ function generateModuleReadme(
   
   // Business scenario
   sections.push(`## 🎯 业务场景\n`);
-  sections.push(`**[请 AI 补充]**\n`);
-  sections.push(`- **核心价值**: [该模块解决的核心问题]`);
-  sections.push(`- **服务对象**: [哪些用户群体/系统使用这个模块]`);
-  sections.push(`- **场景1**: [具体业务场景]`);
-  sections.push(`- **场景2**: [具体业务场景]`);
-  sections.push(`- **场景3**: [具体业务场景]\n`);
+  sections.push(`> **❗ 重要**: 此部分必须全面且准确，是 AI 理解业务的关键\n`);
+  sections.push(`**[请 AI 补充: 仔细阅读代码后填写]**\n`);
+  sections.push(`### 核心价值`);
+  sections.push(`- **解决的问题**: [该模块解决什么业务问题]`);
+  sections.push(`- **业务目标**: [该模块要实现什么业务目标]\n`);
+  sections.push(`### 服务对象`);
+  sections.push(`| 用户类型 | 使用场景 | 操作频率 |`);
+  sections.push(`|----------|----------|----------|`);
+  sections.push(`| [用户类型1] | [使用场景] | [高/中/低] |`);
+  sections.push(`| [用户类型2] | [使用场景] | [高/中/低] |\n`);
+  sections.push(`### 业务场景详情`);
+  sections.push(`#### 场景1: [场景名称]`);
+  sections.push(`- **触发条件**: [什么情况下触发]`);
+  sections.push(`- **操作步骤**: 1. xxx 2. xxx 3. xxx`);
+  sections.push(`- **预期结果**: [操作完成后的结果]`);
+  sections.push(`- **异常处理**: [失败时如何处理]\n`);
+  sections.push(`#### 场景2: [场景名称]`);
+  sections.push(`- **触发条件**: [什么情况下触发]`);
+  sections.push(`- **操作步骤**: 1. xxx 2. xxx 3. xxx`);
+  sections.push(`- **预期结果**: [操作完成后的结果]`);
+  sections.push(`- **异常处理**: [失败时如何处理]\n`);
+  sections.push(`#### 场景3: [场景名称]`);
+  sections.push(`[请补充...]\n`);
   
   // Core business flows
   sections.push(`## 🔄 核心业务流程\n`);
-  sections.push(`**[请 AI 补充: 绘制 1-2 个核心流程的 Mermaid 序列图]**\n`);
+  sections.push(`**[请 AI 补充: 绘制 3-5 个核心流程的 Mermaid 序列图，覆盖主要业务场景]**\n`);
+  sections.push(`要求：每个核心场景都需要流程图，标注校验点/分支逻辑/异常处理\n`);
   sections.push(`### 流程1: [流程名称]\n`);
   sections.push(`\`\`\`mermaid`);
   sections.push(`sequenceDiagram`);
@@ -1398,14 +1490,77 @@ function generateModuleReadme(
   sections.push(`    Service-->>Controller: 返回结果`);
   sections.push(`    Controller-->>User: 响应`);
   sections.push(`\`\`\`\n`);
+  sections.push(`### 流程2: [流程名称]\n`);
+  sections.push(`[请绘制流程图...]\n`);
+  sections.push(`### 流程3: [流程名称]\n`);
+  sections.push(`[请绘制流程图...]\n`);
+  sections.push(`### 流程4: [流程名称]\n`);
+  sections.push(`[请绘制流程图...]\n`);
+  sections.push(`### 流程5: [流程名称]\n`);
+  sections.push(`[请绘制流程图...]\n`);
   
   // Business rules
   sections.push(`## 📜 核心业务规则\n`);
-  sections.push(`**[请 AI 补充: 提取 3-5 个核心业务规则]**\n`);
-  sections.push(`### 规则 1: [规则名称]`);
-  sections.push(`- **判断条件**: [什么情况下触发]`);
-  sections.push(`- **处理逻辑**: [如何处理]`);
-  sections.push(`- **异常情况**: [边界场景处理]\n`);
+  sections.push(`> **❗ 重要**: 此部分必须全面且准确，是 AI 编程的依据\n`);
+  sections.push(`**[请 AI 补充: 从代码中提取所有业务规则，包括校验规则、计算规则、状态规则等]**\n`);
+  sections.push(`### 校验规则\n`);
+  sections.push(`| 规则名称 | 校验条件 | 错误提示 | 触发时机 |`);
+  sections.push(`|----------|----------|----------|----------|`);
+  sections.push(`| [请补充规则名] | [请补充条件表达式] | [请补充错误码和消息] | [请补充哪个操作] |`);
+  sections.push(`| [请补充规则名] | [请补充条件表达式] | [请补充错误码和消息] | [请补充哪个操作] |\n`);
+  sections.push(`### 业务计算规则\n`);
+  sections.push(`| 规则名称 | 计算公式 | 适用场景 | 示例 |`);
+  sections.push(`|----------|----------|----------|------|`);
+  sections.push(`| [请补充规则名] | [请补充公式] | [请补充场景] | [请补充示例] |\n`);
+  sections.push(`### 状态转换规则\n`);
+  sections.push(`| 当前状态 | 操作 | 目标状态 | 前置条件 | 后置动作 |`);
+  sections.push(`|----------|------|----------|----------|----------|`);
+  sections.push(`| [请补充状态] | [请补充操作] | [请补充状态] | [请补充条件] | [请补充动作] |\n`);
+  sections.push(`### 详细规则说明\n`);
+  sections.push(`#### 规则 1: [请补充规则名称]`);
+  sections.push(`- **业务背景**: [请补充: 为什么需要这个规则]`);
+  sections.push(`- **判断条件**: [请补充: 什么情况下触发]`);
+  sections.push(`- **处理逻辑**: [请补充: 如何处理]`);
+  sections.push(`- **异常情况**: [请补充: 边界场景处理]`);
+  sections.push(`- **代码位置**: [请补充: 哪个类/方法]\n`);
+  sections.push(`**实现伪代码**`);
+  sections.push(`\`\`\``);
+  sections.push(`// 规则 1 实现逻辑`);
+  sections.push(`[请补充: 输入参数]`);
+  sections.push(``);
+  sections.push(`1. 检查条件`);
+  sections.push(`   IF [请补充: 条件表达式] THEN`);
+  sections.push(`       [请补充: 执行操作]`);
+  sections.push(`   ELSE`);
+  sections.push(`       [请补充: 异常处理]`);
+  sections.push(`   END IF`);
+  sections.push(``);
+  sections.push(`2. 返回结果`);
+  sections.push(`   [请补充: 返回什么]`);
+  sections.push(`\`\`\`\n`);
+  sections.push(`#### 规则 2: [请补充规则名称]`);
+  sections.push(`- **业务背景**: [请补充: 为什么需要这个规则]`);
+  sections.push(`- **判断条件**: [请补充: 什么情况下触发]`);
+  sections.push(`- **处理逻辑**: [请补充: 如何处理]`);
+  sections.push(`- **异常情况**: [请补充: 边界场景处理]`);
+  sections.push(`- **代码位置**: [请补充: 哪个类/方法]\n`);
+  sections.push(`**实现伪代码**`);
+  sections.push(`\`\`\``);
+  sections.push(`// 规则 2 实现逻辑`);
+  sections.push(`[请补充: 输入参数]`);
+  sections.push(``);
+  sections.push(`1. 检查条件`);
+  sections.push(`   IF [请补充: 条件表达式] THEN`);
+  sections.push(`       [请补充: 执行操作]`);
+  sections.push(`   ELSE`);
+  sections.push(`       [请补充: 异常处理]`);
+  sections.push(`   END IF`);
+  sections.push(``);
+  sections.push(`2. 返回结果`);
+  sections.push(`   [请补充: 返回什么]`);
+  sections.push(`\`\`\`\n`);
+  sections.push(`#### 规则 3: [请补充规则名称]`);
+  sections.push(`[请按照上述格式补充...]\n`);
   
   // State machine
   sections.push(`## 🔀 状态流转\n`);
@@ -1422,6 +1577,20 @@ function generateModuleReadme(
   sections.push(`| 状态 | 说明 | 可执行操作 |`);
   sections.push(`|------|------|-----------|`);
   sections.push(`| CREATED | [说明] | [操作] |\n`);
+  
+  // Exception handling specification
+  sections.push(`## ⚠️ 异常处理规范\n`);
+  sections.push(`**[请 AI 补充: 列出该模块的常见异常和处理方式]**\n`);
+  sections.push(`### 常见错误码\n`);
+  sections.push(`| 错误码 | 含义 | 触发场景 | 处理建议 |`);
+  sections.push(`|--------|------|----------|----------|`);
+  sections.push(`| 400 | 参数错误 | [场景] | [建议] |`);
+  sections.push(`| 404 | 资源不存在 | [场景] | [建议] |`);
+  sections.push(`| 500 | 系统异常 | [场景] | [建议] |\n`);
+  sections.push(`### 业务异常\n`);
+  sections.push(`| 异常类 | 触发条件 | 处理方式 |`);
+  sections.push(`|---------|----------|----------|`);
+  sections.push(`| [XxxException] | [条件] | [处理] |\n`);
   
   // Module statistics
   sections.push(`## 📊 模块统计\n`);
@@ -1515,6 +1684,137 @@ function generateModuleReadme(
   sections.push(`| 缓存读取 | \`cacheAPI.getOrSetCache(key, loader, expire)\` | 缓存穿透保护 |`);
   sections.push(`| 缓存删除 | \`cacheAPI.deleteFromCache(key)\` | 清除缓存 |\n`);
   
+  // MyBatis-Plus 查询示例
+  sections.push(`### MyBatis-Plus 查询示例\n`);
+  sections.push(`**[请 AI 补充: 根据项目实际使用情况补充更多示例]**\n`);
+  sections.push(`\`\`\`java`);
+  sections.push(`// 1. 简单查询 - 根据条件查询单条记录`);
+  sections.push(`XxxEntity entity = xxxMapper.selectOne(`);
+  sections.push(`    new LambdaQueryWrapper<XxxEntity>()`);
+  sections.push(`        .eq(XxxEntity::getCode, code)`);
+  sections.push(`        .eq(XxxEntity::getStatus, 1)`);
+  sections.push(`);`);
+  sections.push(``);
+  sections.push(`// 2. 列表查询 - 带分页`);
+  sections.push(`Page<XxxEntity> page = new Page<>(pageNum, pageSize);`);
+  sections.push(`LambdaQueryWrapper<XxxEntity> wrapper = new LambdaQueryWrapper<XxxEntity>()`);
+  sections.push(`    .like(StringUtils.isNotBlank(name), XxxEntity::getName, name)`);
+  sections.push(`    .eq(status != null, XxxEntity::getStatus, status)`);
+  sections.push(`    .orderByDesc(XxxEntity::getGmtCreate);`);
+  sections.push(`Page<XxxEntity> result = xxxMapper.selectPage(page, wrapper);`);
+  sections.push(``);
+  sections.push(`// 3. 聚合查询 - 统计数量`);
+  sections.push(`Long count = xxxMapper.selectCount(`);
+  sections.push(`    new LambdaQueryWrapper<XxxEntity>()`);
+  sections.push(`        .eq(XxxEntity::getTenantCode, tenantCode)`);
+  sections.push(`        .between(XxxEntity::getGmtCreate, startTime, endTime)`);
+  sections.push(`);`);
+  sections.push(``);
+  sections.push(`// 4. 批量更新`);
+  sections.push(`xxxMapper.update(null,`);
+  sections.push(`    new LambdaUpdateWrapper<XxxEntity>()`);
+  sections.push(`        .set(XxxEntity::getStatus, newStatus)`);
+  sections.push(`        .in(XxxEntity::getId, idList)`);
+  sections.push(`);`);
+  sections.push(``);
+  sections.push(`// 5. 存在性检查`);
+  sections.push(`boolean exists = xxxMapper.exists(`);
+  sections.push(`    new LambdaQueryWrapper<XxxEntity>()`);
+  sections.push(`        .eq(XxxEntity::getCode, code)`);
+  sections.push(`);`);
+  sections.push(`\`\`\`\n`);
+  
+  // 事务处理示例
+  sections.push(`### 事务处理示例\n`);
+  sections.push(`**[请 AI 补充: 根据项目实际使用情况补充更多示例]**\n`);
+  sections.push(`\`\`\`java`);
+  sections.push(`// 1. 基本事务 - 方法级别`);
+  sections.push(`@Transactional(rollbackFor = Exception.class)`);
+  sections.push(`public Result<Void> createOrder(OrderReq req) {`);
+  sections.push(`    // 业务逻辑...`);
+  sections.push(`    orderMapper.insert(order);`);
+  sections.push(`    orderItemMapper.insertBatch(items);`);
+  sections.push(`    return Result.success();`);
+  sections.push(`}`);
+  sections.push(``);
+  sections.push(`// 2. 编程式事务 - 细粒度控制`);
+  sections.push(`@Resource`);
+  sections.push(`private TransactionTemplate transactionTemplate;`);
+  sections.push(``);
+  sections.push(`public Result<Void> complexOperation() {`);
+  sections.push(`    // 非事务操作: 查询、校验`);
+  sections.push(`    XxxEntity entity = xxxMapper.selectById(id);`);
+  sections.push(`    if (entity == null) {`);
+  sections.push(`        return Result.fail("NOT_FOUND", "记录不存在");`);
+  sections.push(`    }`);
+  sections.push(``);
+  sections.push(`    // 事务操作: 修改数据`);
+  sections.push(`    return transactionTemplate.execute(status -> {`);
+  sections.push(`        try {`);
+  sections.push(`            xxxMapper.updateById(entity);`);
+  sections.push(`            yyyMapper.insert(relatedEntity);`);
+  sections.push(`            return Result.success();`);
+  sections.push(`        } catch (Exception e) {`);
+  sections.push(`            status.setRollbackOnly();`);
+  sections.push(`            return Result.fail("ERROR", e.getMessage());`);
+  sections.push(`        }`);
+  sections.push(`    });`);
+  sections.push(`}`);
+  sections.push(``);
+  sections.push(`// 3. 事务传播 - 嵌套调用`);
+  sections.push(`@Transactional(propagation = Propagation.REQUIRED)`);
+  sections.push(`public void outerMethod() {`);
+  sections.push(`    // 外层事务`);
+  sections.push(`    innerMethod(); // 加入外层事务`);
+  sections.push(`}`);
+  sections.push(``);
+  sections.push(`@Transactional(propagation = Propagation.REQUIRES_NEW)`);
+  sections.push(`public void innerMethod() {`);
+  sections.push(`    // 新建独立事务，不受外层影响`);
+  sections.push(`}`);
+  sections.push(`\`\`\`\n`);
+  
+  // 通用工具类使用示例
+  sections.push(`### 通用工具类使用示例\n`);
+  sections.push(`**[请 AI 补充: 根据项目实际使用情况补充更多示例]**\n`);
+  sections.push(`\`\`\`java`);
+  sections.push(`// 1. Result 统一返回`);
+  sections.push(`// 成功返回`);
+  sections.push(`return Result.success(data);`);
+  sections.push(`return Result.success(); // 无数据返回`);
+  sections.push(``);
+  sections.push(`// 失败返回`);
+  sections.push(`return Result.fail("PARAM_ERROR", "参数错误");`);
+  sections.push(`return Result.fail(ErrorCode.NOT_FOUND, "记录不存在");`);
+  sections.push(``);
+  sections.push(`// 2. 异常抛出`);
+  sections.push(`// 业务异常 - 会被全局异常处理器捕获`);
+  sections.push(`throw new FmsBaseDataSysException("PARAM_ERROR", "参数不合法");`);
+  sections.push(`throw new FmsBaseDataSysException(ErrorCode.DUPLICATE, "code已存在");`);
+  sections.push(``);
+  sections.push(`// 3. 缓存操作`);
+  sections.push(`// 读取缓存，不存在则加载`);
+  sections.push(`XxxDTO dto = cacheAPI.getOrSetCache(`);
+  sections.push(`    CacheKey.XXX_KEY + code,`);
+  sections.push(`    () -> xxxMapper.selectByCode(code),`);
+  sections.push(`    3600 // 过期时间(秒)`);
+  sections.push(`);`);
+  sections.push(``);
+  sections.push(`// 删除缓存`);
+  sections.push(`cacheAPI.deleteFromCache(CacheKey.XXX_KEY + code);`);
+  sections.push(``);
+  sections.push(`// 4. 实体操作`);
+  sections.push(`// 新增时设置创建人/时间`);
+  sections.push(`entity.markNew(operator);`);
+  sections.push(``);
+  sections.push(`// 更新时设置修改人/时间`);
+  sections.push(`entity.markUpdate(operator);`);
+  sections.push(``);
+  sections.push(`// DO 与 Entity 互转`);
+  sections.push(`XxxEntity entity = XxxEntity.do2Entity(xxxDO);`);
+  sections.push(`XxxDO xxxDO = entity.entity2DO();`);
+  sections.push(`\`\`\`\n`);
+  
   sections.push(`### DTO 转换规范\n`);
   sections.push(`| 场景 | 方法 | 示例 |`);
   sections.push(`|------|------|------|`);
@@ -1559,18 +1859,87 @@ function generateControllersDoc(moduleName: string, controllers: ClassInfo[], co
     // API endpoints
     if (cls.methods.length > 0) {
       sections.push(`### API 端点\n`);
-      sections.push(`| 方法 | 用途 | 重要业务逻辑 |`);
-      sections.push(`|------|------|-------------|`);
+      sections.push(`| 端点 | 用途 | 参数格式要求 | 常见错误码 |`);
+      sections.push(`|------|------|--------------|------------|`);
       
       for (const method of cls.methods) {
         const desc = method.description || method.businessLogic || '**[请补充]**';
-        sections.push(`| \`${method.name}()\` | ${desc} | [请说明调用链和关键检查] |`);
+        // 获取参数信息，生成需要补充的格式提示
+        const paramHints = method.parameters.length > 0
+          ? '**[请补充：' + method.parameters.map(p => `${p.name}的格式要求`).join('、') + ']**'
+          : '-';
+        sections.push(`| \`${method.name}()\` | ${desc} | ${paramHints} | **[请补充错误码]** |`);
       }
       sections.push(``);
+      
+      // 请求响应示例
+      sections.push(`### 请求响应示例\n`);
+      sections.push(`**[请 AI 补充: 为每个核心 API 提供完整示例]**\n`);
+      
+      // 为每个方法生成请求响应示例
+      for (const method of cls.methods) {
+        sections.push(`#### ${method.name}()\n`);
+        sections.push(`**请求示例**`);
+        sections.push(`\`\`\`json`);
+        if (method.parameters.length > 0) {
+          sections.push(`// POST /api/xxx/${method.name}`);
+          sections.push(`{`);
+          for (const param of method.parameters) {
+            sections.push(`  "${param.name}": "[请补充示例值]"`);
+          }
+          sections.push(`}`);
+        } else {
+          sections.push(`// GET /api/xxx/${method.name}`);
+          sections.push(`// 无请求体`);
+        }
+        sections.push(`\`\`\`\n`);
+        
+        sections.push(`**成功响应**`);
+        sections.push(`\`\`\`json`);
+        sections.push(`{`);
+        sections.push(`  "success": true,`);
+        sections.push(`  "code": "200",`);
+        sections.push(`  "data": {`);
+        sections.push(`    // [请补充: ${method.returnType || 'void'} 的完整结构]`);
+        sections.push(`  }`);
+        sections.push(`}`);
+        sections.push(`\`\`\`\n`);
+        
+        sections.push(`**失败响应**`);
+        sections.push(`\`\`\`json`);
+        sections.push(`{`);
+        sections.push(`  "success": false,`);
+        sections.push(`  "code": "[错误码]",`);
+        sections.push(`  "message": "[错误描述]"`);
+        sections.push(`}`);
+        sections.push(`\`\`\`\n`);
+      }
     }
+    
+    // 异常处理
+    sections.push(`### 异常处理\n`);
+    sections.push(`| 错误码 | 含义 | 触发场景 | 返回示例 |`);
+    sections.push(`|--------|------|----------|----------|`);
+    sections.push(`| 400 | 参数错误 | **[请补充]** | **[请补充]** |`);
+    sections.push(`| 401 | 未授权 | **[请补充]** | **[请补充]** |`);
+    sections.push(`| 404 | 资源不存在 | **[请补充]** | **[请补充]** |`);
+    sections.push(`| 500 | 服务器错误 | **[请补充]** | **[请补充]** |`);
+    sections.push(``)
     
     sections.push(`---\n`);
   }
+  
+  // 完成检查清单
+  sections.push(`---\n`);
+  sections.push(`## ✅ 完成检查\n`);
+  sections.push(`完成补充后，请执行以下检查：\n`);
+  sections.push(`- [ ] 每个 Controller 的描述已填写`);
+  sections.push(`- [ ] 每个 API 端点的用途已填写`);
+  sections.push(`- [ ] 每个 API 的参数格式要求已填写`);
+  sections.push(`- [ ] 每个 API 的错误码已填写`);
+  sections.push(`- [ ] 请求响应示例已补充完整`);
+  sections.push(`- [ ] 异常处理表格已填写`);
+  sections.push(`- [ ] 搜索 \`[请补充\` 结果为 0\n`);
   
   return sections.join('\n');
 }
@@ -1583,7 +1952,8 @@ function generateServicesDoc(moduleName: string, services: ClassInfo[], context:
   sections.push(`[← 返回模块概览](README.md)\n`);
   sections.push(`---\n`);
   
-  sections.push(`> **AI 处理指南**: 请逐个 Service 补充方法描述，完成后报告 "✅ Services 已补充"\n`);
+  sections.push(`> **AI 处理指南**: 请逐个 Service 补充方法描述，完成后报告 "✅ Services 已补充"`);
+  sections.push(`> **强制要求**: 每个方法的业务描述和可能异常必须填写，禁止遗漏\n`);
   
   for (const cls of services) {
     sections.push(`## ${cls.name}\n`);
@@ -1603,21 +1973,162 @@ function generateServicesDoc(moduleName: string, services: ClassInfo[], context:
     // Methods
     if (cls.methods.length > 0) {
       sections.push(`### 核心方法\n`);
-      sections.push(`| 方法 | 参数 | 返回类型 | 业务描述 |`);
-      sections.push(`|------|------|----------|----------|`);
+      sections.push(`| 方法 | 参数 | 返回类型 | 业务描述 | 可能异常 |`);
+      sections.push(`|------|------|----------|----------|----------|`);
       
       for (const method of cls.methods) {
         const params = method.parameters.length > 0 
           ? method.parameters.map(p => `${p.name}`).join(', ')
           : '-';
         const desc = method.description || method.businessLogic || '**[请补充]**';
-        sections.push(`| \`${method.name}()\` | \`${params}\` | \`${method.returnType || 'void'}\` | ${desc} |`);
+        sections.push(`| \`${method.name}()\` | \`${params}\` | \`${method.returnType || 'void'}\` | ${desc} | **[异常类型]** |`);
       }
       sections.push(``);
+      
+      // 方法实现伪代码
+      sections.push(`### 方法实现伪代码\n`);
+      sections.push(`**[请 AI 补充: 为每个核心方法提供实现伪代码]**\n`);
+      
+      // 为每个方法生成伪代码模板
+      for (const method of cls.methods) {
+        const params = method.parameters.length > 0 
+          ? method.parameters.map(p => `${p.type} ${p.name}`).join(', ')
+          : '';
+        sections.push(`#### ${method.name}(${method.parameters.map(p => p.name).join(', ')})\n`);
+        sections.push(`- **方法用途**: [请补充: 这个方法做什么]`);
+        sections.push(`- **调用场景**: [请补充: 什么情况下调用]`);
+        sections.push(`- **事务要求**: [请补充: 是否需要事务，REQUIRED/REQUIRES_NEW/无]\n`);
+        sections.push(`**实现伪代码**`);
+        sections.push(`\`\`\``);
+        sections.push(`// ${method.name} 实现逻辑`);
+        sections.push(``);
+        sections.push(`输入: ${method.parameters.length > 0 ? method.parameters.map(p => `${p.name}`).join(', ') : '无'}`);
+        sections.push(`输出: ${method.returnType || 'void'}`);
+        sections.push(``);
+        sections.push(`1. 参数校验`);
+        if (method.parameters.length > 0) {
+          for (const param of method.parameters) {
+            sections.push(`   IF ${param.name} == null THEN`);
+            sections.push(`       [请补充: 抛出什么异常]`);
+            sections.push(`   END IF`);
+          }
+        } else {
+          sections.push(`   [无参数校验]`);
+        }
+        sections.push(``);
+        sections.push(`2. 业务校验`);
+        sections.push(`   [请补充: 业务规则校验]`);
+        sections.push(`   IF [请补充: 校验条件] THEN`);
+        sections.push(`       [请补充: 抛出什么异常]`);
+        sections.push(`   END IF`);
+        sections.push(``);
+        sections.push(`3. 核心逻辑`);
+        sections.push(`   STEP 1: [请补充: 第一步操作]`);
+        sections.push(`   STEP 2: [请补充: 第二步操作]`);
+        sections.push(`   STEP 3: [请补充: 第三步操作]`);
+        sections.push(``);
+        sections.push(`4. 数据操作`);
+        sections.push(`   CALL [请补充: Mapper/Service].[请补充: 方法名]([请补充: 参数])`);
+        sections.push(`   CALL [请补充: Mapper/Service].[请补充: 方法名]([请补充: 参数])`);
+        sections.push(``);
+        sections.push(`5. 缓存处理`);
+        sections.push(`   [请补充: 是否需要清除/更新缓存]`);
+        sections.push(``);
+        sections.push(`6. 返回结果`);
+        sections.push(`   IF 成功 THEN`);
+        sections.push(`       RETURN [请补充: 返回内容]`);
+        sections.push(`   ELSE`);
+        sections.push(`       THROW [请补充: 异常类型]([请补充: 错误码], [请补充: 错误消息])`);
+        sections.push(`   END IF`);
+        sections.push(`\`\`\`\n`);
+      }
     }
+    
+    // 事务和异常处理
+    sections.push(`### 事务与异常处理\n`);
+    sections.push(`| 方法 | 事务传播 | 可能抛出异常 | 异常处理建议 |`);
+    sections.push(`|------|----------|--------------|--------------|`);
+    sections.push(`| **[方法名]** | REQUIRED | **[异常类]** | **[处理方式]** |`);
+    sections.push(``)
     
     sections.push(`---\n`);
   }
+  
+  // 事务处理示例
+  sections.push(`## 事务处理示例\n`);
+  sections.push(`**[请 AI 补充: 根据项目实际代码补充更多示例]**\n`);
+  sections.push(`### 示例 1：需要事务的操作\n`);
+  sections.push(`\`\`\`java`);
+  sections.push(`// 场景：新增/修改/删除操作，涉及多表修改时必须使用事务`);
+  sections.push(`@Transactional(rollbackFor = Exception.class)`);
+  sections.push(`public Result<Void> createXxx(XxxReq req) {`);
+  sections.push(`    // 1. 参数校验`);
+  sections.push(`    if (req.getCode() == null) {`);
+  sections.push(`        throw new FmsBaseDataSysException("PARAM_ERROR", "code不能为空");`);
+  sections.push(`    }`);
+  sections.push(``);
+  sections.push(`    // 2. 业务校验`);
+  sections.push(`    if (xxxMapper.existsByCode(req.getCode())) {`);
+  sections.push(`        throw new FmsBaseDataSysException("DUPLICATE", "code已存在");`);
+  sections.push(`    }`);
+  sections.push(``);
+  sections.push(`    // 3. 保存主表`);
+  sections.push(`    XxxEntity entity = new XxxEntity();`);
+  sections.push(`    BeanUtils.copyProperties(req, entity);`);
+  sections.push(`    entity.markNew(operator);`);
+  sections.push(`    xxxMapper.insert(entity);`);
+  sections.push(``);
+  sections.push(`    // 4. 保存关联表（同一事务）`);
+  sections.push(`    for (ItemReq item : req.getItems()) {`);
+  sections.push(`        XxxItemEntity itemEntity = new XxxItemEntity();`);
+  sections.push(`        itemEntity.setXxxId(entity.getId());`);
+  sections.push(`        xxxItemMapper.insert(itemEntity);`);
+  sections.push(`    }`);
+  sections.push(``);
+  sections.push(`    // 5. 清除缓存`);
+  sections.push(`    cacheAPI.deleteFromCache(CacheKey.XXX_KEY + entity.getCode());`);
+  sections.push(``);
+  sections.push(`    return Result.success();`);
+  sections.push(`}`);
+  sections.push(`\`\`\`\n`);
+  sections.push(`### 示例 2：不需要事务的操作（只读查询）\n`);
+  sections.push(`\`\`\`java`);
+  sections.push(`// 场景：纯查询操作，不修改数据，不需要事务`);
+  sections.push(`// 注意：不加 @Transactional，或使用 readOnly=true`);
+  sections.push(`public Result<XxxDTO> queryXxx(String code) {`);
+  sections.push(`    // 1. 参数校验`);
+  sections.push(`    if (StringUtils.isBlank(code)) {`);
+  sections.push(`        return Result.fail("PARAM_ERROR", "code不能为空");`);
+  sections.push(`    }`);
+  sections.push(``);
+  sections.push(`    // 2. 优先读缓存`);
+  sections.push(`    XxxDTO dto = cacheAPI.getOrSetCache(`);
+  sections.push(`        CacheKey.XXX_KEY + code,`);
+  sections.push(`        () -> {`);
+  sections.push(`            XxxEntity entity = xxxMapper.selectByCode(code);`);
+  sections.push(`            return entity != null ? entity.toDTO() : null;`);
+  sections.push(`        },`);
+  sections.push(`        3600`);
+  sections.push(`    );`);
+  sections.push(``);
+  sections.push(`    // 3. 返回结果`);
+  sections.push(`    if (dto == null) {`);
+  sections.push(`        return Result.fail("NOT_FOUND", "记录不存在");`);
+  sections.push(`    }`);
+  sections.push(`    return Result.success(dto);`);
+  sections.push(`}`);
+  sections.push(`\`\`\`\n`);
+  
+  // 完成检查清单
+  sections.push(`---\n`);
+  sections.push(`## ✅ 完成检查\n`);
+  sections.push(`完成补充后，请执行以下检查：\n`);
+  sections.push(`- [ ] 每个 Service 的描述已填写`);
+  sections.push(`- [ ] 每个方法的业务描述已填写`);
+  sections.push(`- [ ] 每个方法的可能异常已填写`);
+  sections.push(`- [ ] 每个核心方法的实现伪代码已填写`);
+  sections.push(`- [ ] 事务与异常处理表格已填写`);
+  sections.push(`- [ ] 搜索 \`[请补充\` 结果为 0\n`);
   
   return sections.join('\n');
 }
@@ -1642,12 +2153,14 @@ function generateModelsDoc(moduleName: string, entities: ClassInfo[], dtos: Clas
       sections.push(`- **描述**: ${cls.description || '**[请补充: 该实体代表什么]**'}\n`);
       
       if (cls.fields.length > 0) {
-        sections.push(`| 字段 | 类型 | 业务含义 | 示例/取值 |`);
-        sections.push(`|------|------|----------|----------|`);
+        sections.push(`| 字段 | 类型 | 必填 | 业务含义 | 格式/取值/约束 | 示例 |`);
+        sections.push(`|------|------|------|----------|----------------|------|`);
         
         for (const field of cls.fields) {
           const desc = field.description || '[请补充]';
-          sections.push(`| \`${field.name}\` | \`${field.type}\` | ${desc} | [示例] |`);
+          // 尝试从注解推断必填
+          const required = field.optional === false ? '是' : (field.optional === true ? '否' : '[是/否]');
+          sections.push(`| \`${field.name}\` | \`${field.type}\` | ${required} | ${desc} | **[长度/范围/枚举值]** | **[示例值]** |`);
         }
         sections.push(``);
       }
@@ -1665,19 +2178,31 @@ function generateModelsDoc(moduleName: string, entities: ClassInfo[], dtos: Clas
       sections.push(`- **描述**: ${cls.description || '**[请补充: 该 DTO 的用途]**'}\n`);
       
       if (cls.fields.length > 0) {
-        sections.push(`| 字段 | 类型 | 业务含义 | 是否必填 |`);
-        sections.push(`|------|------|----------|----------|`);
+        sections.push(`| 字段 | 类型 | 必填 | 业务含义 | 格式/取值/约束 | 示例 |`);
+        sections.push(`|------|------|------|----------|----------------|------|`);
         
         for (const field of cls.fields) {
           const desc = field.description || '[请补充]';
           const required = field.optional ? '否' : '是';
-          sections.push(`| \`${field.name}\` | \`${field.type}\` | ${desc} | ${required} |`);
+          sections.push(`| \`${field.name}\` | \`${field.type}\` | ${required} | ${desc} | **[长度/范围/枚举值]** | **[示例值]** |`);
         }
         sections.push(``);
       }
       sections.push(`---\n`);
     }
   }
+  
+  // 完成检查清单
+  sections.push(`---\n`);
+  sections.push(`## ✅ 完成检查\n`);
+  sections.push(`完成补充后，请执行以下检查：\n`);
+  sections.push(`- [ ] 每个 Entity/DTO 的描述已填写`);
+  sections.push(`- [ ] 每个字段的业务含义已填写`);
+  sections.push(`- [ ] 每个字段的格式/取值/约束已填写`);
+  sections.push(`- [ ] 每个字段的示例值已填写`);
+  sections.push(`- [ ] 搜索 \`[请补充\` 结果为 0`);
+  sections.push(`- [ ] 搜索 \`[示例值]\` 结果为 0`);
+  sections.push(`- [ ] 搜索 \`[长度/范围\` 结果为 0\n`);
   
   return sections.join('\n');
 }
@@ -1705,6 +2230,263 @@ function generateOthersDoc(moduleName: string, others: ClassInfo[], context: Pro
     }
     sections.push(`---\n`);
   }
+  
+  return sections.join('\n');
+}
+
+/**
+ * Generate AI completion prompt for one-click business logic filling
+ * This creates a comprehensive prompt that AI can use to fill in all business descriptions
+ */
+export function generateAICompletionPrompt(context: ProjectContext): string {
+  const sections: string[] = [];
+  const allClasses = context.allClasses || [];
+  
+  // Calculate statistics
+  const controllers = allClasses.filter(c => c.type === 'controller');
+  const services = allClasses.filter(c => c.type === 'service');
+  const entities = allClasses.filter(c => c.type === 'entity');
+  const dtos = allClasses.filter(c => c.type === 'dto');
+  const repositories = allClasses.filter(c => c.type === 'repository');
+  
+  // Helper to extract module name from file path
+  const getModuleName = (filePath: string): string => {
+    // Try to get module name from path like src/main/java/com/xxx/module/...
+    const parts = filePath.split('/');
+    // Find 'java' and take the next meaningful segment after package structure
+    const javaIndex = parts.indexOf('java');
+    if (javaIndex >= 0 && javaIndex + 4 < parts.length) {
+      // Skip com/xxx/project -> get module name
+      return parts[javaIndex + 4] || 'main';
+    }
+    // Fallback: use parent directory name
+    return parts[parts.length - 2] || 'main';
+  };
+  
+  // Group by module
+  const moduleMap = new Map<string, ClassInfo[]>();
+  for (const cls of allClasses) {
+    const module = getModuleName(cls.filePath);
+    if (!moduleMap.has(module)) {
+      moduleMap.set(module, []);
+    }
+    moduleMap.get(module)!.push(cls);
+  }
+  const moduleNames = Array.from(moduleMap.keys()).sort();
+  
+  // Header
+  sections.push(`# AI 一键补全业务文档\n`);
+  sections.push(`> 将此提示词发送给 AI 助手，让 AI 自动分析代码并填充所有业务描述\n`);
+  sections.push(`---\n`);
+  
+  // ❗ Critical Requirements
+  sections.push(`## ❗ 强制要求（必须遵守）\n`);
+  sections.push(`**警告：以下要求必须严格执行，禁止跳过或遗漏！**\n`);
+  sections.push(`1. **零占位符原则**：所有 \`**[请补充]**\`、\`**[请补充错误码]**\`、\`**[示例值]**\` 等占位符必须替换为实际内容`);
+  sections.push(`2. **无遗漏原则**：每一个 Controller/Service/Entity/DTO 的每一个字段和方法都必须有完整描述`);
+  sections.push(`3. **检查原则**：每完成一个文件，必须搜索 \`[请补充\` 确认无遗漏`);
+  sections.push(`4. **完成标准**：文档中不应包含任何 \`[请补充\`、\`**[请补充\`、\`[示例\`、\`[格式\` 等占位文本\n`);
+  
+  // Project Overview
+  sections.push(`## 📊 项目概览\n`);
+  sections.push(`| 统计项 | 数量 |`);
+  sections.push(`|--------|------|`);
+  sections.push(`| 模块数 | ${moduleNames.length} |`);
+  sections.push(`| Controller | ${controllers.length} |`);
+  sections.push(`| Service | ${services.length} |`);
+  sections.push(`| Entity | ${entities.length} |`);
+  sections.push(`| DTO | ${dtos.length} |`);
+  sections.push(`| Repository/Mapper | ${repositories.length} |`);
+  sections.push(`| 总类数 | ${allClasses.length} |\n`);
+  
+  // Module List
+  sections.push(`## 📁 模块列表\n`);
+  
+  // 判断是否是基础设施模块
+  const infraModulePatterns = [
+    'config', 'configuration', 'common', 'utils', 'util',
+    'core', 'base', 'framework', 'infrastructure', 'bootstrap',
+    'test', 'testutils', 'mock'
+  ];
+  const skipModulePatterns = ['starter'];
+  const isInfraModule = (name: string) => infraModulePatterns.some(pattern => 
+    name.toLowerCase().includes(pattern)
+  );
+  const shouldSkipModule = (name: string) => skipModulePatterns.some(pattern => 
+    name.toLowerCase().includes(pattern)
+  );
+  
+  for (const moduleName of moduleNames) {
+    // 跳过 starter 模块
+    if (shouldSkipModule(moduleName)) {
+      sections.push(`- ~~${moduleName}~~ — 配置类模块，已跳过`);
+      continue;
+    }
+    
+    const moduleClasses = moduleMap.get(moduleName)!;
+    const mControllers = moduleClasses.filter(c => c.type === 'controller').length;
+    const mServices = moduleClasses.filter(c => c.type === 'service').length;
+    const mEntities = moduleClasses.filter(c => c.type === 'entity').length;
+    
+    if (isInfraModule(moduleName)) {
+      sections.push(`- **${moduleName}** ⚠️ 基础设施模块（可简化处理）: ${moduleClasses.length} 个类`);
+    } else {
+      sections.push(`- **${moduleName}**: ${mControllers} Controllers, ${mServices} Services, ${mEntities} Entities`);
+    }
+  }
+  sections.push(``);
+  
+  // The Prompt
+  sections.push(`---\n`);
+  sections.push(`## 🎯 AI 补全指令\n`);
+  sections.push(`请按以下步骤为项目补充完整的业务文档：\n`);
+  
+  sections.push(`### 步骤 1：阅读代码，理解业务\n`);
+  sections.push(`请依次打开以下目录中的所有 .java 文件，仔细阅读代码：`);
+  sections.push(``);
+  for (const moduleName of moduleNames) {
+    sections.push(`- \`cainiaospec/modules/${moduleName}/\``);
+  }
+  sections.push(``);
+  sections.push(`重点关注：`);
+  sections.push(`- Controller 的 API 端点和请求处理逻辑`);
+  sections.push(`- Service 的核心业务方法和调用链`);
+  sections.push(`- Entity/DTO 的字段含义和用途`);
+  sections.push(``);
+  
+  sections.push(`### 步骤 2：补充模块概览（README.md）\n`);
+  sections.push(`对于每个模块的 \`README.md\`，补充以下内容：\n`);
+  sections.push(`1. **🎯 业务场景**`);
+  sections.push(`   - 核心价值：该模块解决什么问题`);
+  sections.push(`   - 服务对象：谁在使用这个模块`);
+  sections.push(`   - 主要场景：列出 3-5 个具体业务场景\n`);
+  sections.push(`2. **🔄 核心业务流程**`);
+  sections.push(`   - 用 Mermaid sequenceDiagram 绘制 3-5 个核心流程`);
+  sections.push(`   - 标注关键的校验点和分支逻辑\n`);
+  sections.push(`3. **📜 核心业务规则**`);
+  sections.push(`   - 列出该模块的关键业务规则`);
+  sections.push(`   - 每条规则包含：判断条件、处理逻辑、异常情况\n`);
+  sections.push(`4. **🔀 状态流转**（如果有状态机）`);
+  sections.push(`   - 用 Mermaid stateDiagram-v2 绘制状态图`);
+  sections.push(`   - 说明每个状态的含义和可执行操作\n`);
+  sections.push(`5. **❓ FAQ**`);
+  sections.push(`   - 添加 3-5 个开发者常见问题\n`);
+  
+  sections.push(`### 步骤 3：补充 Controller 描述（controllers.md）\n`);
+  sections.push(`对于每个 Controller：\n`);
+  sections.push(`1. **描述**：一句话说明该 Controller 负责什么业务`);
+  sections.push(`2. **业务功能**：列出 2-3 个主要功能点`);
+  sections.push(`3. **服务场景**：说明哪些用户/系统使用这些 API`);
+  sections.push(`4. **API 端点表**：为每个方法填写：`);
+  sections.push(`   - 用途说明`);
+  sections.push(`   - 参数格式要求（如日期格式 yyyy-MM-dd、枚举取值、必填/选填）`);
+  sections.push(`   - 返回值说明`);
+  sections.push(`   - 常见错误码和处理\n`);
+  
+  sections.push(`### 步骤 4：补充 Service 描述（services.md）\n`);
+  sections.push(`对于每个 Service 的核心方法：\n`);
+  sections.push(`1. **业务描述**：这个方法做什么业务`);
+  sections.push(`2. **执行步骤**：1.xxx 2.xxx 3.xxx`);
+  sections.push(`3. **调用链**：调用了哪些其他服务/DAO`);
+  sections.push(`4. **异常处理**：可能抛出的异常和处理方式\n`);
+  
+  sections.push(`### 步骤 5：补充 Model 字段描述（models.md）\n`);
+  sections.push(`对于每个 Entity/DTO 的每个字段，必须填写：\n`);
+  sections.push(`| 字段 | 类型 | 必填 | 业务含义 | 格式/取值 | 示例 |`);
+  sections.push(`|------|------|------|----------|----------|------|`);
+  sections.push(`| code | String | 是 | 订单编号 | 20位，前缀ORD | \`ORD20250312001234\` |`);
+  sections.push(`| status | Integer | 是 | 订单状态 | 1=待处理,2=处理中,3=完成 | \`1\` |`);
+  sections.push(`| amount | BigDecimal | 是 | 订单金额 | 单位:元,保留两位小数 | \`199.99\` |`);
+  sections.push(`| createTime | Date | 否 | 创建时间 | yyyy-MM-dd HH:mm:ss | \`2025-03-12 10:30:00\` |\n`);
+  sections.push(`**重点关注：**`);
+  sections.push(`- 枚举字段必须列出所有取值及含义`);
+  sections.push(`- 日期字段必须说明格式`);
+  sections.push(`- 金额字段必须说明单位和精度`);
+  sections.push(`- 编码字段必须说明规则\n`);
+  
+  // Output Format
+  sections.push(`---\n`);
+  sections.push(`## 📝 输出格式要求\n`);
+  sections.push(`1. **直接修改文件**：不要输出到对话，直接编辑 cainiaospec/modules/ 下的 md 文件`);
+  sections.push(`2. **删除占位符**：完成补充后，删除所有 \`[请 AI 补充]\` 占位符`);
+  sections.push(`3. **使用中文**：所有描述使用简洁的中文`);
+  sections.push(`4. **保持格式**：保持原有的 Markdown 表格和标题格式`);
+  sections.push(`5. **逐模块处理**：一个模块一个模块地处理，每完成一个模块报告进度\n`);
+  sections.push(`6. **强制检查**：每个文件完成后必须执行以下检查：`);
+  sections.push(`   \`\`\``);
+  sections.push(`   搜索关键词: [请补充  [格式  [示例  [错误码  **[`);
+  sections.push(`   确认结果: 必须为 0 个匹配项`);
+  sections.push(`   \`\`\`\n`);
+  
+  // Key Classes Summary (help AI focus)
+  sections.push(`---\n`);
+  sections.push(`## 🔍 核心类速览\n`);
+  sections.push(`以下是需要重点关注的核心类（按模块分组）：\n`);
+  
+  for (const moduleName of moduleNames.slice(0, 10)) { // Limit to first 10 modules
+    const moduleClasses = moduleMap.get(moduleName)!;
+    sections.push(`### ${moduleName}\n`);
+    
+    const mControllers = moduleClasses.filter(c => c.type === 'controller');
+    const mServices = moduleClasses.filter(c => c.type === 'service');
+    
+    if (mControllers.length > 0) {
+      sections.push(`**Controllers:**`);
+      for (const ctrl of mControllers.slice(0, 5)) {
+        const methodCount = ctrl.methods.length;
+        sections.push(`- \`${ctrl.name}\` (${methodCount} 个 API) - ${ctrl.description || '待补充'}`);
+      }
+      if (mControllers.length > 5) {
+        sections.push(`- ... 还有 ${mControllers.length - 5} 个 Controller`);
+      }
+      sections.push(``);
+    }
+    
+    if (mServices.length > 0) {
+      sections.push(`**Services:**`);
+      for (const svc of mServices.slice(0, 5)) {
+        const methodCount = svc.methods.length;
+        sections.push(`- \`${svc.name}\` (${methodCount} 个方法) - ${svc.description || '待补充'}`);
+      }
+      if (mServices.length > 5) {
+        sections.push(`- ... 还有 ${mServices.length - 5} 个 Service`);
+      }
+      sections.push(``);
+    }
+  }
+  
+  if (moduleNames.length > 10) {
+    sections.push(`\n> 注：还有 ${moduleNames.length - 10} 个模块未展示，请查看 cainiaospec/modules/ 目录\n`);
+  }
+  
+  // 后续工作流简介
+  sections.push(`---\n`);
+  sections.push(`## 📖 文档补充完成后\n`);
+  sections.push(`文档补充完成后，请阅读 **cainiaospec/AGENTS.md** 了解 CainiaoSpec 的完整工作流程：\n`);
+  sections.push(`| 阶段 | 命令 | 说明 |`);
+  sections.push(`|------|------|------|`);
+  sections.push(`| 创建提案 | \`/proposal 功能描述\` | 让 AI 读取模块文档，创建详细的实施提案 |`);
+  sections.push(`| 实施提案 | \`/apply change-id\` | 按照提案实施代码变更 |`);
+  sections.push(`| 归档变更 | \`/archive change-id\` | 归档并同步更新模块文档 |\n`);
+  sections.push(`> 提示：试试告诉 AI “请解释 cainiaospec/AGENTS.md 中的工作流程”\n`);
+  
+  // Final instruction
+  sections.push(`---\n`);
+  sections.push(`## 🚀 开始执行\n`);
+  sections.push(`请现在开始执行上述步骤，从第一个模块 **${moduleNames[0] || 'main'}** 开始。\n`);
+  sections.push(`每完成一个模块，请报告："✅ [模块名] 已完成，占位符检查: 0 个遗漏"\n`);
+  sections.push(`全部完成后，执行最终检查并报告：\n`);
+  sections.push(`\`\`\``);
+  sections.push(`🎉 所有模块业务文档已补充完成！`);
+  sections.push(``);
+  sections.push(`完成度检查:`);
+  sections.push(`- README.md: X 个模块 ✓`);
+  sections.push(`- controllers.md: X 个 Controller, Y 个 API ✓`);
+  sections.push(`- services.md: X 个 Service, Y 个方法 ✓`);
+  sections.push(`- models.md: X 个 Entity/DTO, Y 个字段 ✓`);
+  sections.push(``);
+  sections.push(`占位符检查: 全局搜索 "[请补充" 结果为 0`);
+  sections.push(`\`\`\`\n`);
   
   return sections.join('\n');
 }

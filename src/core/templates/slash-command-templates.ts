@@ -9,13 +9,18 @@ const proposalGuardrails = `${baseGuardrails}\n- Identify any vague or ambiguous
 - Do not write any code during the proposal stage. Only create design documents (proposal.md, tasks.md, design.md, and spec deltas). Implementation happens in the apply stage after approval.`;
 
 const proposalSteps = `**Steps**
-1. Review \`cainiaospec/project.md\`, run \`cainiaospec list\` and \`cainiaospec list --specs\`, and inspect related code or docs (e.g., via \`rg\`/\`ls\`) to ground the proposal in current behaviour; note any gaps that require clarification.
-2. Choose a unique verb-led \`change-id\` and scaffold \`proposal.md\`, \`tasks.md\`, and \`design.md\` (when needed) under \`cainiaospec/changes/<id>/\`.
-3. Map the change into concrete capabilities or requirements, breaking multi-scope efforts into distinct spec deltas with clear relationships and sequencing.
-4. Capture architectural reasoning in \`design.md\` when the solution spans multiple systems, introduces new patterns, or demands trade-off discussion before committing to specs.
-5. Draft spec deltas in \`changes/<id>/specs/<capability>/spec.md\` (one folder per capability) using \`## ADDED|MODIFIED|REMOVED Requirements\` with at least one \`#### Scenario:\` per requirement and cross-reference related capabilities when relevant.
-6. Draft \`tasks.md\` as an ordered list of small, verifiable work items that deliver user-visible progress, include validation (tests, tooling), and highlight dependencies or parallelizable work.
-7. Validate with \`cainiaospec validate <id> --strict\` and resolve every issue before sharing the proposal.`;
+1. **理解项目结构**: 阅读 \`cainiaospec/project.md\` 了解项目概览。
+2. **理解业务逻辑**: 根据用户需求，阅读相关模块的文档：
+   - \`cainiaospec/modules/[模块名]/README.md\` - 业务场景、流程图、业务规则
+   - \`cainiaospec/modules/[模块名]/controllers.md\` - API 端点、参数格式、错误码
+   - \`cainiaospec/modules/[模块名]/services.md\` - 业务方法、异常处理
+   - \`cainiaospec/modules/[模块名]/models.md\` - 实体字段、格式约束、示例值
+3. **检查现有规范**: 运行 \`cainiaospec list\` 和 \`cainiaospec list --specs\` 查看现有变更和规范。
+4. **创建变更目录**: 选择一个唯一的动词开头的 \`change-id\`，在 \`cainiaospec/changes/<id>/\` 下创建 \`proposal.md\`、\`tasks.md\` 和 \`design.md\`（如需）。
+5. **设计变更范围**: 将变更拆分为具体的能力或需求，在 \`design.md\` 中记录架构决策。
+6. **起草规范变更**: 在 \`changes/<id>/specs/<capability>/spec.md\` 中使用 \`## ADDED|MODIFIED|REMOVED Requirements\` 格式。
+7. **起草任务列表**: 在 \`tasks.md\` 中列出有序的、可验证的工作项。
+8. **验证提案**: 运行 \`cainiaospec validate <id> --strict\` 并解决所有问题。`;
 
 
 const proposalReferences = `**Reference**
@@ -29,7 +34,12 @@ Track these steps as TODOs and complete them one by one.
 2. Work through tasks sequentially, keeping edits minimal and focused on the requested change.
 3. Confirm completion before updating statuses—make sure every item in \`tasks.md\` is finished.
 4. Update the checklist after all work is done so each task is marked \`- [x]\` and reflects reality.
-5. Reference \`cainiaospec list\` or \`cainiaospec show <item>\` when additional context is required.`;
+5. **同步更新模块文档**: 实施完成后，必须更新相关的模块文档：
+   - \`cainiaospec/modules/[模块名]/controllers.md\` - 新增/修改的 API 端点、参数格式、错误码
+   - \`cainiaospec/modules/[模块名]/services.md\` - 新增/修改的业务方法、异常处理
+   - \`cainiaospec/modules/[模块名]/models.md\` - 新增/修改的实体字段、格式约束
+   - \`cainiaospec/modules/[模块名]/README.md\` - 如果业务流程有变化
+6. Reference \`cainiaospec list\` or \`cainiaospec show <item>\` when additional context is required.`;
 
 const applyReferences = `**Reference**
 - Use \`cainiaospec show <id> --json --deltas-only\` if you need additional context from the proposal while implementing.`;
@@ -43,7 +53,18 @@ const archiveSteps = `**Steps**
 2. Validate the change ID by running \`cainiaospec list\` (or \`cainiaospec show <id>\`) and stop if the change is missing, already archived, or otherwise not ready to archive.
 3. Run \`cainiaospec archive <id> --yes\` so the CLI moves the change and applies spec updates without prompts (use \`--skip-specs\` only for tooling-only work).
 4. Review the command output to confirm the target specs were updated and the change landed in \`changes/archive/\`.
-5. Validate with \`cainiaospec validate --strict\` and inspect with \`cainiaospec show <id>\` if anything looks off.`;
+5. **必须同步更新模块文档**（不可跳过）: 
+   如果变更涉及新增/修改 Controller、Service 或 Model，必须更新相应的模块文档：
+   - \`cainiaospec/modules/[模块名]/controllers.md\` - 新增/修改的 API 端点、参数格式、错误码
+   - \`cainiaospec/modules/[模块名]/services.md\` - 新增/修改的业务方法、伪代码、异常处理
+   - \`cainiaospec/modules/[模块名]/models.md\` - 新增/修改的实体字段、格式约束、示例值
+   - \`cainiaospec/modules/[模块名]/README.md\` - 如果业务流程/规则有变化
+   
+   **更新要求**:
+   - 每个新增的类/方法/字段都必须记录
+   - 填写完整的占位符内容，不留 \`[请补充]\`
+   - 保持文档与代码同步
+6. Validate with \`cainiaospec validate --strict\` and inspect with \`cainiaospec show <id>\` if anything looks off.`;
 
 const archiveReferences = `**Reference**
 - Use \`cainiaospec list\` to confirm change IDs before archiving.

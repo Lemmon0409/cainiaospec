@@ -1,5 +1,5 @@
 import { agentsTemplate } from './agents-template.js';
-import { projectTemplate, ProjectContext, generateModularDocs } from './project-template.js';
+import { projectTemplate, ProjectContext, generateModularDocs, generateAICompletionPrompt } from './project-template.js';
 import { claudeTemplate } from './claude-template.js';
 import { clineTemplate } from './cline-template.js';
 import { costrictTemplate } from './costrict-template.js';
@@ -67,5 +67,5 @@ export class TemplateManager {
   }
 }
 
-export { ProjectContext } from './project-template.js';
+export { ProjectContext, generateAICompletionPrompt } from './project-template.js';
 export type { SlashCommandId } from './slash-command-templates.js';

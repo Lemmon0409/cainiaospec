@@ -1265,27 +1265,125 @@ TBD - created by archiving change ${changeName}. Update Purpose after archive.
       return this.generateNewModuleDoc(moduleName, newClasses, changeName);
     }
     
-    // Parse existing classes from the doc
-    const existingClasses = this.parseClassesFromModuleDoc(existingContent);
+    // Add change history section if not exists
+    let updatedContent = existingContent;
+    const changeHistoryHeader = '## 变更历史';
+    const today = this.getArchiveDate();
+    const changeEntry = `- ${today}: ${changeName} (${newClasses.length} 个类变更)`;
     
-    // Merge: For each new class, either update existing or append
-    for (const newClass of newClasses) {
-      const existingIndex = existingClasses.findIndex(c => c.name === newClass.name);
+    if (updatedContent.includes(changeHistoryHeader)) {
+      // Append to existing change history
+      const historyIndex = updatedContent.indexOf(changeHistoryHeader);
+      const nextSectionIndex = updatedContent.indexOf('\n## ', historyIndex + changeHistoryHeader.length);
       
-      if (existingIndex !== -1) {
-        // Update existing class (preserve user-added descriptions)
-        existingClasses[existingIndex] = this.mergeClassInfo(
-          existingClasses[existingIndex],
-          newClass
-        );
+      if (nextSectionIndex !== -1) {
+        // Insert before next section
+        updatedContent = 
+          updatedContent.substring(0, nextSectionIndex) +
+          changeEntry + '\n' +
+          updatedContent.substring(nextSectionIndex);
       } else {
-        // Add new class
-        existingClasses.push(newClass);
+        // Append at the end
+        updatedContent += '\n' + changeEntry;
+      }
+    } else {
+      // Add new change history section at the end
+      updatedContent += `
+
+${changeHistoryHeader}
+
+${changeEntry}
+`;
+    }
+    
+    // For each new class, update or append
+    for (const newClass of newClasses) {
+      const classHeader = `### ${newClass.name}`;
+      
+      if (updatedContent.includes(classHeader)) {
+        // Class exists - update it while preserving user descriptions
+        updatedContent = this.updateExistingClassInDoc(updatedContent, newClass);
+      } else {
+        // Add new class section to appropriate type section
+        const typeSection = this.getTypeSectionHeader(newClass.type);
+        const typeSectionIndex = updatedContent.indexOf(typeSection);
+        
+        if (typeSectionIndex !== -1) {
+          // Find next ## section to insert before
+          const nextSectionIndex = updatedContent.indexOf('\n## ', typeSectionIndex + typeSection.length);
+          const classSection = '\n' + this.generateClassSection(newClass);
+          
+          if (nextSectionIndex !== -1) {
+            updatedContent = 
+              updatedContent.substring(0, nextSectionIndex) +
+              classSection +
+              updatedContent.substring(nextSectionIndex);
+          } else {
+            updatedContent += classSection;
+          }
+        } else {
+          // Create type section and add class
+          updatedContent += `\n${typeSection}\n\n${this.generateClassSection(newClass)}`;
+        }
       }
     }
     
-    // Rebuild the module doc with merged classes
-    return this.rebuildModuleDoc(existingContent, existingClasses, moduleName);
+    return updatedContent;
+  }
+  
+  /**
+   * Get the section header for a class type
+   */
+  private getTypeSectionHeader(type: string): string {
+    const headers: Record<string, string> = {
+      controller: '## Controllers',
+      service: '## Services',
+      entity: '## Entities',
+      dto: '## DTOs',
+      repository: '## Repositories',
+      other: '## 其他类',
+    };
+    return headers[type] || '## 其他类';
+  }
+  
+  /**
+   * Update existing class in documentation while preserving user descriptions
+   */
+  private updateExistingClassInDoc(content: string, newClass: ClassInfo): string {
+    const classHeader = `### ${newClass.name}`;
+    const classStart = content.indexOf(classHeader);
+    if (classStart === -1) return content;
+    
+    // Find the end of this class section (next ### or ## header)
+    const afterHeader = content.substring(classStart + classHeader.length);
+    const nextClassMatch = afterHeader.match(/\n###\s/);
+    const nextSectionMatch = afterHeader.match(/\n##\s/);
+    
+    let classEnd = content.length;
+    if (nextClassMatch && nextClassMatch.index !== undefined) {
+      const nextClassPos = classStart + classHeader.length + nextClassMatch.index;
+      classEnd = Math.min(classEnd, nextClassPos);
+    }
+    if (nextSectionMatch && nextSectionMatch.index !== undefined) {
+      const nextSectionPos = classStart + classHeader.length + nextSectionMatch.index;
+      classEnd = Math.min(classEnd, nextSectionPos);
+    }
+    
+    // Extract existing description if user has written one
+    const existingSection = content.substring(classStart, classEnd);
+    const descMatch = existingSection.match(/\*\*描述\*\*:\s*(.+?)(?:\n|$)/);
+    const userDescription = descMatch && !descMatch[1].includes('[AI 补充') 
+      ? descMatch[1] 
+      : null;
+    
+    // Generate new class section
+    const newSection = this.generateClassSection({
+      ...newClass,
+      description: userDescription || newClass.description,
+    });
+    
+    // Replace
+    return content.substring(0, classStart) + newSection + '\n' + content.substring(classEnd);
   }
   
   /**
@@ -1428,37 +1526,6 @@ TBD - created by archiving change ${changeName}. Update Purpose after archive.
     return sections.join('\n');
   }
   
-  /**
-   * Parse existing classes from module doc (simple parsing)
-   */
-  private parseClassesFromModuleDoc(content: string): ClassInfo[] {
-    // This is a simple implementation - just return empty for now
-    // In a complete implementation, we would parse the markdown to extract class info
-    // For now, we'll use append-only strategy
-    return [];
-  }
-  
-  /**
-   * Merge class info, preserving user descriptions
-   */
-  private mergeClassInfo(existing: ClassInfo, newInfo: ClassInfo): ClassInfo {
-    return {
-      ...newInfo,
-      // Preserve user-written descriptions if they exist and are not placeholders
-      description: existing.description && !existing.description.includes('[AI 补充') 
-        ? existing.description 
-        : newInfo.description,
-    };
-  }
-  
-  /**
-   * Rebuild module doc with merged classes
-   */
-  private rebuildModuleDoc(existingContent: string, classes: ClassInfo[], moduleName: string): string {
-    // Simple implementation: append new classes to existing content
-    // In a complete implementation, we would do intelligent merging
-    return existingContent;
-  }
 }
 
 // Type definitions for archive analysis
