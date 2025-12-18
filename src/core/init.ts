@@ -13,7 +13,7 @@ import {
 import chalk from 'chalk';
 import ora from 'ora';
 import { FileSystemUtils } from '../utils/file-system.js';
-import { TemplateManager, ProjectContext } from './templates/index.js';
+import { TemplateManager, ProjectContext, generateAICompletionPrompt } from './templates/index.js';
 import { ToolRegistry } from './configurators/registry.js';
 import { SlashCommandRegistry } from './configurators/slash/registry.js';
 import {
@@ -820,6 +820,13 @@ export class InitCommand {
 
       await FileSystemUtils.writeFile(filePath, content);
     }
+    
+    // Generate AI completion prompt file if scan-code is enabled
+    if (this.scanCode && context.allClasses && context.allClasses.length > 0) {
+      const aiPromptPath = path.join(openspecPath, 'AI_COMPLETION_PROMPT.md');
+      const aiPromptContent = generateAICompletionPrompt(context);
+      await FileSystemUtils.writeFile(aiPromptPath, aiPromptContent);
+    }
   }
 
   private async buildProjectContext(
@@ -999,92 +1006,31 @@ export class InitCommand {
     console.log(chalk.yellow('   静态扫描无法理解业务含义，需要 AI 补充关键描述'));
     console.log();
         
-    // 方案 A
+    // 一键补全方案
     console.log(chalk.cyan('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
-    console.log(chalk.bgGreen.black(' 方案 A：分步补充（推荐，适合大模块） '));
-    console.log(chalk.cyan('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
-    console.log();
-    console.log(chalk.green('一次只处理一个小任务，避免 AI 迷失焦点。每个模块按以下 4 步完成：'));
-    console.log();
-    console.log(chalk.white('█ 步骤 1: 补充 README.md'));
-    console.log(chalk.gray('  复制以下内容发给 AI：'));
-    console.log(chalk.white('  ────────────────────────────────────────'));
-    console.log(chalk.yellow('  请打开 cainiaospec/modules/[模块名]/README.md'));
-    console.log(chalk.yellow('  补充以下章节：'));
-    console.log(chalk.yellow('  1. 🎯 业务场景 - 核心价值、服务对象、主要场景'));
-    console.log(chalk.yellow('  2. 🔄 核心业务流程 - 用 Mermaid 绘制 1-2 个流程图'));
-    console.log(chalk.yellow('  3. 📜 核心业务规则 - 判断条件、处理逻辑'));
-    console.log(chalk.yellow('  4. 🔀 状态流转 - 用 Mermaid 绘制状态图'));
-    console.log(chalk.yellow('  5. ❓ 常见问题 FAQ - 添加 3-5 个问题'));
-    console.log(chalk.yellow('  完成后告诉我："✅ README 已补充"'));
-    console.log(chalk.white('  ────────────────────────────────────────'));
-    console.log();
-    console.log(chalk.white('█ 步骤 2: 补充 controllers.md'));
-    console.log(chalk.gray('  AI 完成步骤 1 后，复制以下内容：'));
-    console.log(chalk.white('  ────────────────────────────────────────'));
-    console.log(chalk.yellow('  请打开 cainiaospec/modules/[模块名]/controllers.md'));
-    console.log(chalk.yellow('  为每个 Controller 补充：'));
-    console.log(chalk.yellow('  1. 描述 - 一句话说明负责什么'));
-    console.log(chalk.yellow('  2. 业务功能 - 列出 2-3 个主要功能'));
-    console.log(chalk.yellow('  3. 服务场景 - 哪些用户/系统使用'));
-    console.log(chalk.yellow('  4. API 端点表 - 每个方法的用途和业务逻辑'));
-    console.log(chalk.yellow('  完成后告诉我："✅ Controllers 已补充"'));
-    console.log(chalk.white('  ────────────────────────────────────────'));
-    console.log();
-    console.log(chalk.white('█ 步骤 3: 补充 services.md'));
-    console.log(chalk.gray('  AI 完成步骤 2 后，复制以下内容：'));
-    console.log(chalk.white('  ────────────────────────────────────────'));
-    console.log(chalk.yellow('  请打开 cainiaospec/modules/[模块名]/services.md'));
-    console.log(chalk.yellow('  为每个 Service 的核心方法补充：'));
-    console.log(chalk.yellow('  1. 业务描述 - 这个方法做什么'));
-    console.log(chalk.yellow('  2. 执行步骤 - 1.xxx 2.xxx 3.xxx'));
-    console.log(chalk.yellow('  完成后告诉我："✅ Services 已补充"'));
-    console.log(chalk.white('  ────────────────────────────────────────'));
-    console.log();
-    console.log(chalk.white('█ 步骤 4: 补充 models.md'));
-    console.log(chalk.gray('  AI 完成步骤 3 后，复制以下内容：'));
-    console.log(chalk.white('  ────────────────────────────────────────'));
-    console.log(chalk.yellow('  请打开 cainiaospec/modules/[模块名]/models.md'));
-    console.log(chalk.yellow('  为重要 DTO/Entity 的关键字段补充：'));
-    console.log(chalk.yellow('  1. 业务含义 - 这个字段代表什么'));
-    console.log(chalk.yellow('  2. 示例值 - 如 "ORD20250312001234"'));
-    console.log(chalk.yellow('  3. 单位/取值 - 如 "单位:秒"'));
-    console.log(chalk.yellow('  完成后告诉我："✅ Models 已补充"'));
-    console.log(chalk.white('  ────────────────────────────────────────'));
-    console.log();
-    console.log(chalk.gray('📄 完整分步提示词：查看 STEP_BY_STEP_DOC_PROMPT.md'));
-    console.log();
-        
-    // 方案 B
-    console.log(chalk.cyan('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
-    console.log(chalk.bgBlue.white(' 方案 B：一次性补充（适合小模块，<50个类） '));
+    console.log(chalk.bgGreen.black(' 🚀 一键补全业务文档 '));
     console.log(chalk.cyan('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
     console.log();
-    console.log(chalk.blue('复制以下内容发给 AI：'));
-    console.log(chalk.white('────────────────────────────────────────'));
-    console.log(chalk.yellow('请打开 cainiaospec/modules/[模块名]/ 目录下的所有文件：'));
-    console.log(chalk.yellow('- README.md'));
-    console.log(chalk.yellow('- controllers.md'));
-    console.log(chalk.yellow('- services.md'));
-    console.log(chalk.yellow('- models.md'));
+    console.log(chalk.green('复制以下内容发给 AI：'));
     console.log();
-    console.log(chalk.yellow('为所有空白的描述补充内容，包括：'));
-    console.log(chalk.yellow('1. 业务场景、核心流程（Mermaid）、业务规则、状态流转'));
-    console.log(chalk.yellow('2. 每个 Controller 的描述和 API 说明'));
-    console.log(chalk.yellow('3. 每个 Service 方法的业务描述'));
-    console.log(chalk.yellow('4. 重要 DTO 字段的业务含义'));
-    console.log(chalk.yellow('5. FAQ 常见问题'));
+    console.log(chalk.white('┌────────────────────────────────────────────────────────────┐'));
+    console.log(chalk.white('│ ') + chalk.yellow('请先阅读 cainiaospec/AGENTS.md 了解工作流程，') + chalk.white('        │'));
+    console.log(chalk.white('│ ') + chalk.yellow('然后打开 cainiaospec/AI_COMPLETION_PROMPT.md 文件，') + chalk.white('  │'));
+    console.log(chalk.white('│ ') + chalk.yellow('按照其中的指引为项目补充完整的业务文档。') + chalk.white('      │'));
+    console.log(chalk.white('└────────────────────────────────────────────────────────────┘'));
     console.log();
-    console.log(chalk.yellow('完成后告诉我："✅ 模块文档已补充完成"'));
-    console.log(chalk.white('────────────────────────────────────────'));
+    console.log(chalk.gray('AI 会了解：'));
+    console.log(chalk.gray('✓ CainiaoSpec 的三阶段工作流（proposal/apply/archive）'));
+    console.log(chalk.gray('✓ 如何读取模块文档理解业务逻辑'));
+    console.log();
+    console.log(chalk.gray('AI 会自动为你补充：'));
+    console.log(chalk.gray('✓ 业务场景、流程图、业务规则、伪代码'));
+    console.log(chalk.gray('✓ Controller/Service/Model 的业务描述'));
+    console.log(chalk.gray('✓ 关键字段的含义和示例值'));
+    console.log();
+    console.log(chalk.gray('📄 备选：分步提示词见 STEP_BY_STEP_DOC_PROMPT.md'));
     console.log();
     console.log(chalk.cyan('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
-    console.log();
-    console.log(
-      PALETTE.darkGray(
-        '────────────────────────────────────────────────────────────'
-      )
-    );
     console.log();
     console.log(PALETTE.white('📚 后续操作提示词示例：'));
     console.log();
@@ -1213,7 +1159,24 @@ export class InitCommand {
   }
 
   private getQuickStartContent(): string {
-    return `# OpenSpec 快速开始指南
+    return `# CainiaoSpec 快速开始指南
+
+## 📖 第一步：让 AI 了解工作流
+
+初始化完成后，请先发送以下内容给 AI：
+
+\`\`\`
+请阅读 cainiaospec/AGENTS.md 了解 CainiaoSpec 的工作流程，
+然后告诉我你理解了哪些关键流程。
+\`\`\`
+
+AI 会了解：
+- **Stage 1**: 如何创建提案（proposal）
+- **Stage 2**: 如何实施提案（apply）
+- **Stage 3**: 如何归档变更（archive）
+- 如何读取模块文档、理解业务逻辑
+
+---
 
 ## 📚 项目已初始化？下次使用这个指南
 

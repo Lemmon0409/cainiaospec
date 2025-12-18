@@ -43,15 +43,20 @@ Skip proposal for:
 - Tests for existing behavior
 
 **Workflow**
-1. Review \`cainiaospec/project.md\`, \`cainiaospec list\`, and \`cainiaospec list --specs\` to understand current context.
-2. Choose a unique verb-led \`change-id\` and create directory: \`cainiaospec/changes/<id>/\`
-3. **MUST create these files** (in order):
+1. **理解项目结构**: 阅读 \`cainiaospec/project.md\` 了解项目概览，运行 \`cainiaospec list\` 和 \`cainiaospec list --specs\` 查看现有变更和规范。
+2. **理解业务逻辑**: 根据用户需求，阅读相关模块的文档：
+   - \`cainiaospec/modules/[模块名]/README.md\` - 业务场景、流程图、业务规则、状态机
+   - \`cainiaospec/modules/[模块名]/controllers.md\` - API 端点、参数格式、错误码、请求响应示例
+   - \`cainiaospec/modules/[模块名]/services.md\` - 业务方法、异常处理、事务配置
+   - \`cainiaospec/modules/[模块名]/models.md\` - 实体字段、格式约束、示例值
+3. 选择唯一的动词开头的 \`change-id\`，创建目录: \`cainiaospec/changes/<id>/\`
+4. **MUST create these files** (in order):
    - \`proposal.md\` - The "what" and "why"
    - \`tasks.md\` - The "how" (step-by-step implementation)
    - \`design.md\` (optional) - Technical decisions if needed
    - \`specs/\` - Delta specs if affecting capabilities
-4. Draft spec deltas using \`## ADDED|MODIFIED|REMOVED Requirements\` with at least one \`#### Scenario:\` per requirement.
-5. Run \`cainiaospec validate <id> --strict\` and resolve any issues before sharing the proposal.
+5. Draft spec deltas using \`## ADDED|MODIFIED|REMOVED Requirements\` with at least one \`#### Scenario:\` per requirement.
+6. Run \`cainiaospec validate <id> --strict\` and resolve any issues before sharing the proposal.
 
 **⚠️  Common Mistake: DO NOT create only proposal.md and stop. You MUST also create tasks.md in the same change!**
 
@@ -143,6 +148,16 @@ If you discover the proposal is incorrect or incomplete during implementation:
 After deployment, create separate PR to:
 - Move \`changes/[name]/\` → \`changes/archive/YYYY-MM-DD-[name]/\`
 - Update \`specs/\` if capabilities changed
+- **必须同步更新模块文档**（不可跳过）:
+  - \`cainiaospec/modules/[模块名]/controllers.md\` - 新增/修改的 API 端点、参数格式、错误码
+  - \`cainiaospec/modules/[模块名]/services.md\` - 新增/修改的业务方法、伪代码、异常处理
+  - \`cainiaospec/modules/[模块名]/models.md\` - 新增/修改的实体字段、格式约束、示例值
+  - \`cainiaospec/modules/[模块名]/README.md\` - 如果业务流程/规则有变化
+  
+  **更新要求**:
+  - 每个新增的类/方法/字段都必须记录
+  - 填写完整的占位符内容，不留 \`[请补充]\`
+  - 保持文档与代码同步
 - Use \`cainiaospec archive <change-id> --skip-specs --yes\` for tooling-only changes (always pass the change ID explicitly)
 - Run \`cainiaospec validate --strict\` to confirm the archived change passes checks
 
