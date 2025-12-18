@@ -1,6 +1,14 @@
 import { readdirSync, statSync, readFileSync, existsSync } from 'fs';
 import { join, relative, extname, basename } from 'path';
 import { DirectoryMapping } from './templates/project-template.js';
+import {
+  inferMethodDescription,
+  inferClassDescription,
+  inferFieldDescription,
+  generateMethodBusinessDescription,
+  detectOperationPatterns,
+  inferApiDescription,
+} from './description-inferrer.js';
 
 export interface ScanResult {
   directoryStructure: DirectoryMapping[];
@@ -20,6 +28,23 @@ export interface ScanResult {
   projectStructure?: ProjectStructure;
   // Enhanced: Class dependencies graph
   classDependencies?: ClassDependency[];
+  // MyBatis: Mapper XML information
+  mybatisMappers?: MyBatisMapperInfo[];
+}
+
+// MyBatis Mapper XML information
+export interface MyBatisMapperInfo {
+  namespace: string;
+  filePath: string;
+  statements: MyBatisStatement[];
+}
+
+export interface MyBatisStatement {
+  id: string;
+  type: 'select' | 'insert' | 'update' | 'delete';
+  resultType?: string;
+  parameterType?: string;
+  tables?: string[];  // Tables referenced in the SQL
 }
 
 export interface EntityInfo {
@@ -124,6 +149,8 @@ export interface ParameterInfo {
   description?: string;
   optional: boolean;
   defaultValue?: string;
+  decorators?: string[];  // Parameter annotations like @PathVariable, @RequestParam
+  in?: 'path' | 'query' | 'header' | 'body';  // Location inferred from annotation
 }
 
 // Enhanced: API endpoint documentation
@@ -281,10 +308,13 @@ export class CodeScanner {
   // Track scan progress
   private scannedFiles = 0;
   private totalFilesToScan = 0;
+  // MyBatis: Store mapper XML information
+  private mybatisMappers: MyBatisMapperInfo[] = [];
 
   constructor(options: ScanOptions) {
     this.options = {
-      includePatterns: options.includePatterns || ['**/*.ts', '**/*.js'],
+      // Java-only: Scan .java files (MyBatis .xml files are also scanned in scanFile)
+      includePatterns: options.includePatterns || ['**/*.java'],
       excludePatterns: options.excludePatterns || [
         '**/node_modules/**',
         '**/dist/**',
@@ -321,13 +351,18 @@ export class CodeScanner {
     // First pass: analyze project structure (Maven/Gradle modules)
     this.analyzeProjectStructure();
     
-    // Second pass: scan all code files
+    // Second pass: scan all code files (Java + MyBatis XML)
     this.scanDirectory(this.options.rootDir, 0);
+    
+    // Third pass: post-processing after all files are scanned
+    this.correctClassTypesByAnnotations();  // Fix class types based on annotations
+    this.linkAllMyBatisToMappers();          // Link MyBatis XML to Mapper interfaces
+    
     this.analyzeDirectoryStructure();
     this.buildApiDocumentation();
     this.extractBusinessLogic();
     
-    // Third pass: build dependency graph
+    // Fourth pass: build dependency graph
     this.buildDependencyGraph();
 
     return {
@@ -350,6 +385,7 @@ export class CodeScanner {
         dependencies: this.moduleDependencies,
       } : undefined,
       classDependencies: Array.from(this.classDependencies.values()),
+      mybatisMappers: this.mybatisMappers.length > 0 ? this.mybatisMappers : undefined,
     };
   }
 
@@ -378,9 +414,15 @@ export class CodeScanner {
 
   private scanFile(filePath: string): void {
     const ext = extname(filePath);
-    // Support TypeScript, JavaScript, and Java files
-    if (!['.ts', '.js', '.tsx', '.jsx', '.java'].includes(ext)) return;
+    // Java-only: Process .java and MyBatis .xml files
+    if (ext !== '.java' && ext !== '.xml') return;
     if (this.shouldExclude(filePath)) return;
+
+    // Handle MyBatis XML files separately
+    if (ext === '.xml') {
+      this.scanMyBatisXml(filePath);
+      return;
+    }
 
     // Count file types
     const fileType = this.categorizeFile(filePath);
@@ -448,76 +490,73 @@ export class CodeScanner {
   private categorizeFile(filePath: string): string {
     const name = basename(filePath);
     
-    // TypeScript/JavaScript patterns
-    if (name.includes('.entity.') || name.includes('.model.')) return 'entity';
-    if (name.includes('.controller.')) return 'controller';
-    if (name.includes('.service.')) return 'service';
-    if (name.includes('.repository.')) return 'repository';
-    if (name.includes('.dto.')) return 'dto';
-    if (name.includes('.interface.') || name.includes('.types.')) return 'type';
-    if (name.includes('.util.') || name.includes('.helper.')) return 'utility';
-    if (name.includes('.middleware.')) return 'middleware';
-    if (name.includes('.guard.')) return 'guard';
-    if (name.includes('.decorator.')) return 'decorator';
-    if (name.includes('.test.') || name.includes('.spec.')) return 'test';
-    if (name.includes('.config.')) return 'config';
-    if (name.includes('.constant.')) return 'constant';
-    
-    // Java patterns
+    // Java file patterns (prioritize by common naming conventions)
     if (name.endsWith('Controller.java')) return 'controller';
     if (name.endsWith('Service.java') || name.endsWith('ServiceImpl.java')) return 'service';
-    if (name.endsWith('Repository.java') || name.endsWith('Mapper.java') || name.endsWith('DAO.java')) return 'repository';
-    if (name.endsWith('DTO.java') || name.endsWith('VO.java') || name.endsWith('DO.java')) return 'dto';
-    if (name.endsWith('Entity.java') || name.endsWith('Model.java') || name.endsWith('PO.java')) return 'entity';
+    if (name.endsWith('Repository.java') || name.endsWith('Mapper.java') || name.endsWith('DAO.java') || name.endsWith('Dao.java')) return 'repository';
+    if (name.endsWith('DTO.java') || name.endsWith('Dto.java') || name.endsWith('VO.java') || name.endsWith('Vo.java')) return 'dto';
+    if (name.endsWith('DO.java') || name.endsWith('Do.java') || name.endsWith('PO.java') || name.endsWith('Po.java') || name.endsWith('Entity.java') || name.endsWith('Model.java') || name.endsWith('POJO.java')) return 'entity';
     if (name.endsWith('Utils.java') || name.endsWith('Util.java') || name.endsWith('Helper.java')) return 'utility';
-    if (name.endsWith('Config.java') || name.endsWith('Configuration.java')) return 'config';
-    if (name.endsWith('Constants.java') || name.endsWith('Constant.java')) return 'constant';
-    if (name.endsWith('Test.java')) return 'test';
+    if (name.endsWith('Config.java') || name.endsWith('Configuration.java') || name.endsWith('Properties.java')) return 'config';
+    if (name.endsWith('Constants.java') || name.endsWith('Constant.java') || name.endsWith('Enum.java')) return 'constant';
+    if (name.endsWith('Test.java') || name.endsWith('Tests.java') || name.endsWith('IT.java')) return 'test';
+    if (name.endsWith('Interceptor.java') || name.endsWith('Filter.java') || name.endsWith('Aspect.java')) return 'middleware';
+    if (name.endsWith('Handler.java') || name.endsWith('Listener.java')) return 'handler';
     
     return 'other';
   }
 
   private isEntity(filePath: string, content: string): boolean {
-    // TypeScript/JavaScript patterns
-    if ((filePath.includes('.entity.') || filePath.includes('.model.')) &&
-        (content.includes('@Entity') || content.includes('model ='))) {
-      return true;
+    if (!filePath.endsWith('.java')) return false;
+    
+    const name = basename(filePath);
+    
+    // JPA/Hibernate annotations
+    if (content.includes('@Entity') || content.includes('@Table')) return true;
+    
+    // MyBatis-Plus annotations
+    if (content.includes('@TableName') || content.includes('@TableId')) return true;
+    
+    // Common Java naming patterns for entities
+    if (name.endsWith('Entity.java') || name.endsWith('Model.java')) return true;
+    if (name.endsWith('DO.java') || name.endsWith('Do.java')) return true;
+    if (name.endsWith('PO.java') || name.endsWith('Po.java')) return true;
+    if (name.endsWith('POJO.java')) return true;
+    
+    // Check for Lombok @Data with field patterns (common for entities)
+    if (content.includes('@Data') && !name.includes('DTO') && !name.includes('VO') && !name.includes('Request') && !name.includes('Response')) {
+      // Has fields but no service/controller annotations
+      if (!content.includes('@Service') && !content.includes('@Controller') && !content.includes('@Component')) {
+        return true;
+      }
     }
-    // Java patterns
-    if (filePath.endsWith('.java') && 
-        (content.includes('@Entity') || content.includes('@Table') || filePath.includes('Entity.java'))) {
-      return true;
-    }
+    
     return false;
   }
 
   private isController(filePath: string, content: string): boolean {
-    // TypeScript/JavaScript patterns
-    if (filePath.includes('.controller.') &&
-        (content.includes('@Controller') || content.includes('router.'))) {
-      return true;
-    }
-    // Java Spring patterns
-    if (filePath.endsWith('.java') &&
-        (content.includes('@RestController') || content.includes('@Controller') || 
-         filePath.includes('Controller.java'))) {
-      return true;
-    }
+    if (!filePath.endsWith('.java')) return false;
+    
+    // Spring MVC annotations
+    if (content.includes('@RestController') || content.includes('@Controller')) return true;
+    
+    // Common naming pattern
+    if (basename(filePath).endsWith('Controller.java')) return true;
+    
     return false;
   }
 
   private isService(filePath: string, content: string): boolean {
-    // TypeScript/JavaScript patterns
-    if (filePath.includes('.service.') &&
-        (content.includes('@Injectable') || content.includes('class') && content.includes('Service'))) {
-      return true;
-    }
-    // Java Spring patterns
-    if (filePath.endsWith('.java') &&
-        (content.includes('@Service') || filePath.includes('Service.java') || 
-         filePath.includes('ServiceImpl.java'))) {
-      return true;
-    }
+    if (!filePath.endsWith('.java')) return false;
+    
+    // Spring annotations
+    if (content.includes('@Service')) return true;
+    
+    // Common naming patterns
+    const name = basename(filePath);
+    if (name.endsWith('Service.java') || name.endsWith('ServiceImpl.java')) return true;
+    if (name.endsWith('Manager.java') || name.endsWith('ManagerImpl.java')) return true;
+    
     return false;
   }
 
@@ -574,7 +613,8 @@ export class CodeScanner {
   }
 
   private extractClassName(content: string): string | null {
-    const classMatch = content.match(/class\s+(\w+)/);
+    // Java: Match class, interface, or enum with optional modifiers
+    const classMatch = content.match(/\b(?:public|protected|private|abstract|final|\s)*\b(?:class|interface|enum)\s+(\w+)/);
     return classMatch ? classMatch[1] : null;
   }
 
@@ -619,37 +659,60 @@ export class CodeScanner {
     }
 
     // Spring style: @GetMapping("/path"), @PostMapping("/path"), etc.
-    const springMappings = content.matchAll(/@(Get|Post|Put|Delete|Patch|Request)Mapping\s*\(\s*(?:value\s*=\s*)?["']([^"']*)["']\s*(?:,\s*method\s*=\s*RequestMethod\.(\w+))?[^)]*\)\s*(?:public|private|protected)?\s*(?:[\w<>\[\]]+)\s+(\w+)\s*\(/g);
-    for (const match of springMappings) {
-      let method = match[1].toUpperCase();
-      if (method === 'REQUEST' && match[3]) {
-        method = match[3].toUpperCase();
+    // Two-step approach: capture wide annotation block + method signature, then extract Mapping annotations
+    // Requires method signature to end with ) followed by throws/{ /; to avoid matching field initializers
+    const springMethodPattern = /((?:@\w+(?:\([^)]*\))?\s*)+)(public|private|protected)?\s*[\w<>\[\]\.]+\s+(\w+)\s*\([^)]*\)\s*(?:throws\s+[\w,\s]+)?\s*[{;]/g;
+    
+    let methodMatch;
+    while ((methodMatch = springMethodPattern.exec(content)) !== null) {
+      const annotationBlock = methodMatch[1];
+      const methodName = methodMatch[3];
+      
+      // Only process if the annotation block contains a Mapping annotation
+      if (!/@(?:Get|Post|Put|Delete|Patch|Request)Mapping/.test(annotationBlock)) {
+        continue;
       }
-      routes.push({
-        method,
-        path: match[2] || '',
-        handler: match[4],
-      });
-    }
-
-    // Spring short form without explicit value: @GetMapping("/path")
-    const springShortForms = content.matchAll(/@(Get|Post|Put|Delete|Patch)Mapping\s*\(\s*["']([^"']*)["']\s*\)\s*(?:public|private|protected)?\s*(?:[\w<>\[\]]+)\s+(\w+)\s*\(/g);
-    for (const match of springShortForms) {
-      const alreadyMatched = routes.some(r => r.handler === match[3] && r.path === match[2]);
-      if (!alreadyMatched) {
-        routes.push({
-          method: match[1].toUpperCase(),
-          path: match[2],
-          handler: match[3],
-        });
+      
+      const routeInfo = this.parseSpringMappingAnnotation(annotationBlock, methodName);
+      if (routeInfo) {
+        const alreadyMatched = routes.some(r => r.handler === methodName);
+        if (!alreadyMatched) {
+          routes.push(routeInfo);
+        }
       }
     }
 
     return routes;
   }
 
+  private parseSpringMappingAnnotation(annotationBlock: string, methodName: string): RouteInfo | null {
+    let httpMethod = 'GET';
+    let path = '';
+    const specificMapping = annotationBlock.match(/@(Get|Post|Put|Delete|Patch)Mapping/);
+    if (specificMapping) {
+      httpMethod = specificMapping[1].toUpperCase();
+    } else if (annotationBlock.includes('@RequestMapping')) {
+      // Support both method=RequestMethod.GET and method={RequestMethod.GET, RequestMethod.POST}
+      const mm = annotationBlock.match(/method\s*=\s*\{?\s*(?:RequestMethod\.)?([A-Z]+)/);
+      if (mm) httpMethod = mm[1];
+    } else {
+      return null;
+    }
+    const pm1 = annotationBlock.match(/@(?:Get|Post|Put|Delete|Patch|Request)Mapping\s*\(\s*["']([^"']+)["']/);
+    if (pm1) path = pm1[1];
+    if (!path) {
+      const pm2 = annotationBlock.match(/(?:value|path)\s*=\s*["']([^"']+)["']/);
+      if (pm2) path = pm2[1];
+    }
+    if (!path) {
+      const pm3 = annotationBlock.match(/(?:value|path)\s*=\s*\{\s*["']([^"']+)["']/);
+      if (pm3) path = pm3[1];
+    }
+    return { method: httpMethod, path: path, handler: methodName };
+  }
+
   private extractMethods(content: string): MethodInfo[] {
-    const methods: ClassMethodInfo[] = this.extractClassMethods(content);
+    const methods: ClassMethodInfo[] = this.extractClassMethods(content, 'other');
     
     // Convert ClassMethodInfo[] to MethodInfo[] for backward compatibility
     return methods.map(m => ({
@@ -668,17 +731,12 @@ export class CodeScanner {
       dirCounts.set(dir, (dirCounts.get(dir) || 0) + 1);
     });
 
-    // Identify common directories
+    // Identify common directories (Java/Maven structure)
     const commonDirs = [
-      'src/entities', 'src/models',
-      'src/controllers', 'src/routes',
-      'src/services',
-      'src/repositories',
-      'src/dto',
-      'src/utils', 'src/helpers',
-      'src/middleware',
-      'src/config',
-      'tests', 'test',
+      'src/main/java',
+      'src/main/resources',
+      'src/test/java',
+      'src/test/resources',
     ];
 
     for (const dir of commonDirs) {
@@ -744,31 +802,49 @@ export class CodeScanner {
   private detectCommonPatterns(): string[] {
     const patterns: string[] = [];
 
-    if (this.filesByType.get('entity') || 0 > 0) {
+    // FIXED: Correct precedence with parentheses
+    if ((this.filesByType.get('entity') || 0) > 0) {
       patterns.push('Entity-based data modeling');
     }
-    if (this.filesByType.get('dto') || 0 > 0) {
+    if ((this.filesByType.get('dto') || 0) > 0) {
       patterns.push('DTO pattern for data transfer');
     }
-    if (this.filesByType.get('repository') || 0 > 0) {
+    if ((this.filesByType.get('repository') || 0) > 0) {
       patterns.push('Repository pattern for data access');
     }
-    if (this.filesByType.get('service') || 0 > 0) {
+    if ((this.filesByType.get('service') || 0) > 0) {
       patterns.push('Service layer for business logic');
     }
-    if (this.filesByType.get('controller') || 0 > 0) {
+    if ((this.filesByType.get('controller') || 0) > 0) {
       patterns.push('Controller pattern for HTTP handling');
     }
 
     return patterns;
   }
 
-  // Enhanced: Extract imports for pattern detection
+  // Enhanced: Extract imports for pattern detection (Java syntax)
   private extractImports(content: string): void {
-    const importMatches = content.matchAll(/import\s+(?:{[^}]+}|\w+)\s+from\s+['"]([^'"]+)['"]/g);
+    // Java import syntax: 
+    // - import com.xx.yy.ClassName;
+    // - import com.xx.yy.*;
+    // - import static com.xx.yy.Util.*;
+    const importMatches = content.matchAll(/^\s*import\s+(static\s+)?([\w.]+(?:\.\*)?)\s*;/gm);
     for (const match of importMatches) {
-      const importPath = match[1];
-      this.imports.set(importPath, (this.imports.get(importPath) || 0) + 1);
+      const importPath = match[2];
+      let packageName: string;
+      
+      if (importPath.endsWith('.*')) {
+        // Wildcard import: com.xx.yy.* -> package is com.xx.yy
+        packageName = importPath.slice(0, -2);
+      } else if (importPath.includes('.')) {
+        // Class import: com.xx.yy.ClassName -> package is com.xx.yy
+        packageName = importPath.substring(0, importPath.lastIndexOf('.'));
+      } else {
+        // Single name (rare)
+        packageName = importPath;
+      }
+      
+      this.imports.set(packageName, (this.imports.get(packageName) || 0) + 1);
     }
   }
 
@@ -836,24 +912,37 @@ export class CodeScanner {
     return description.length > 0 ? description : undefined;
   }
 
-  // Enhanced: Extract full class information
+  // Enhanced: Extract full class information with auto-inferred descriptions
   private extractClassInfo(filePath: string, content: string, fileType: string): ClassInfo | null {
     // Match both class and interface (for Java), with optional modifiers (public, abstract, etc.)
-    const classMatch = content.match(/(?:public\s+|private\s+|protected\s+|abstract\s+)*(?:class|interface|enum)\s+(\w+)(?:\s+extends\s+(\w+))?(?:\s+implements\s+([\w,\s]+))?/);
+    // Support full qualified names and comma-separated extends (interface A extends B, C)
+    const classMatch = content.match(/(?:public\s+|private\s+|protected\s+|abstract\s+)*(?:class|interface|enum)\s+(\w+)(?:\s+extends\s+([\w\.,\s<>]+?))?(?:\s+implements\s+([\w\.,\s]+))?(?:\s*\{|$)/m);
     if (!classMatch) return null;
 
     const className = classMatch[1];
-    const extendsClass = classMatch[2];
-    const implementsInterfaces = classMatch[3]?.split(',').map(s => s.trim()).filter(Boolean);
+    // Extract simple names from extends (may be comma-separated for interface multi-extends)
+    // Strip generics before processing: BaseMapper<User> -> BaseMapper
+    const extendsRaw = classMatch[2]?.replace(/<[^>]*>/g, '') || '';
+    const extendsList = extendsRaw.split(',').map(s => s.trim().split('.').pop()!).filter(Boolean);
+    const extendsClass = extendsList[0]; // Primary extends class
+    // For interface multi-extends, also add to implements for unified checking
+    // Strip generics from implements too: IService<User> -> IService
+    const implementsRaw = (classMatch[3] || '').replace(/<[^>]*>/g, '');
+    const implementsInterfaces = [
+      ...implementsRaw.split(',').map(s => s.trim().split('.').pop()!).filter(Boolean),
+      ...extendsList.slice(1) // Add secondary extends (for interface multi-extends)
+    ];
     
     const classPosition = content.indexOf(classMatch[0]);
-    const description = this.extractJsDoc(content, classPosition);
+    const jsDocDescription = this.extractJsDoc(content, classPosition);
     const decorators = this.extractDecorators(content);
     const fields = this.extractClassFields(content);
-    const methods = this.extractClassMethods(content);
+    const type = this.mapFileTypeToClassType(fileType);
+    const methods = this.extractClassMethods(content, type);
     const dependencies = this.extractDependencies(content);
 
-    const type = this.mapFileTypeToClassType(fileType);
+    // Auto-infer description if JSDoc is missing
+    const description = jsDocDescription || inferClassDescription(className, type);
 
     return {
       name: className,
@@ -963,9 +1052,10 @@ export class CodeScanner {
           continue;
         }
 
-        // Look for JSDoc description
+        // Look for JSDoc description, auto-infer if missing
         const fieldPosition = content.indexOf(match[0]);
-        const description = this.extractJsDoc(content, fieldPosition);
+        const jsDocDesc = this.extractJsDoc(content, fieldPosition);
+        const description = jsDocDesc || inferFieldDescription(fieldName, fieldType);
 
         fields.push({
           name: fieldName,
@@ -1023,7 +1113,8 @@ export class CodeScanner {
       }
 
       const fieldPosition = content.indexOf(javaMatch[0]);
-      const description = this.extractJsDoc(content, fieldPosition);
+      const jsDocDesc = this.extractJsDoc(content, fieldPosition);
+      const description = jsDocDesc || inferFieldDescription(fieldName, fieldType);
 
       fields.push({
         name: fieldName,
@@ -1044,8 +1135,8 @@ export class CodeScanner {
    * This avoids matching local variables inside methods
    */
   private extractFieldsSection(content: string): string {
-    // Find class body start
-    const classMatch = content.match(/class\s+\w+[^{]*\{/);
+    // Find class/interface/enum body start (supports all Java type declarations)
+    const classMatch = content.match(/(?:class|interface|enum)\s+\w+[^{]*\{/);
     if (!classMatch) {
       return content.substring(0, 10000);
     }
@@ -1080,21 +1171,25 @@ export class CodeScanner {
   }
 
   // Enhanced: Extract class methods with full information
-  private extractClassMethods(content: string): ClassMethodInfo[] {
+  private extractClassMethods(content: string, classType: ClassInfo['type'] = 'other'): ClassMethodInfo[] {
     const methods: ClassMethodInfo[] = [];
     const seen = new Set<string>(); // Track seen methods to avoid duplicates
     
+    // Check if this is an entity/dto class (getter/setter should be simplified)
+    const isDataClass = classType === 'entity' || classType === 'dto';
+    
     // CRITICAL: Extract only class-level methods from the field section to first real method
     // This prevents matching code inside method bodies
-    const classBodyMatch = content.match(/class\s+\w+[^{]*\{([\s\S]*)/m);
+    // Support both class and interface bodies
+    const classBodyMatch = content.match(/(?:class|interface)\s+\w+[^{]*\{([\s\S]*)/m);
     if (!classBodyMatch) return methods;
     
     const classBody = classBodyMatch[1];
     
     // OPTIMIZED: Simplified Java method pattern to avoid catastrophic backtracking
-    // Removed JavaDoc matching from main regex - will extract separately
-    // Pattern: [annotations] [modifiers] ReturnType methodName(params) [throws] {
-    const javaMethodPattern = /^[ \t]*((?:@\w+(?:\([^)]*\))?\s*)*)(public|private|protected)?\s*(static\s+)?(?:final\s+)?(?:synchronized\s+)?(?:<[\w,\s]+>\s+)?([\w<>\[\]\.]+)\s+(\w+)\s*\(([^)]*)\)(?:\s*throws\s+[\w,\s]+)?\s*\{/gm;
+    // Pattern: [annotations] [modifiers] ReturnType methodName(params) [throws] { or ;
+    // Support both concrete methods (ending with {) and interface/abstract methods (ending with ;)
+    const javaMethodPattern = /^[ \t]*((?:@\w+(?:\([^)]*\))?\s*)*)(public|private|protected)?\s*(static\s+)?(?:default\s+)?(?:final\s+)?(?:abstract\s+)?(?:synchronized\s+)?(?:<[\w,\s]+>\s+)?([\w<>\[\]\.]+)\s+(\w+)\s*\(([^)]*)\)(?:\s*throws\s+[\w,\s]+)?\s*(\{|;)/gm;
     
     let match;
     while ((match = javaMethodPattern.exec(classBody)) !== null) {
@@ -1104,6 +1199,7 @@ export class CodeScanner {
       const returnType = match[4]?.trim();
       const methodName = match[5];
       const paramsStr = match[6];
+      const isInterfaceMethod = match[7] === ';'; // Interface/abstract methods end with ;
 
       // Skip if this is a static final method (usually utility methods)
       // Skip constructor and common non-business methods, also skip control flow keywords
@@ -1119,6 +1215,17 @@ export class CodeScanner {
       
       // Skip if looks like a field access or lambda
       if (methodName.includes('.') || methodName.includes('->') || methodName.includes('=>')) continue;
+      
+      // For entity/dto classes: skip getter/setter methods (they're not business logic)
+      // Getter: get* with 0 params, Setter: set* with 1 param and void return
+      if (isDataClass) {
+        const isGetter = methodName.startsWith('get') && paramsStr.trim() === '';
+        const isSetter = methodName.startsWith('set') && returnType === 'void' && paramsStr.includes(',') === false && paramsStr.trim() !== '';
+        const isBooleanGetter = (methodName.startsWith('is') || methodName.startsWith('has') || methodName.startsWith('can')) && paramsStr.trim() === '';
+        if (isGetter || isSetter || isBooleanGetter) {
+          continue; // Skip getter/setter in entity/dto
+        }
+      }
 
       // Create unique method signature to detect duplicates
       const methodSignature = `${methodName}(${paramsStr})`;
@@ -1135,14 +1242,27 @@ export class CodeScanner {
 
       // Extract description from JSDoc (look back from method position)
       const methodPosition = content.indexOf(match[0]);
-      const description = this.extractJsDoc(content, methodPosition);
+      const jsDocDescription = this.extractJsDoc(content, methodPosition);
 
-      // Extract business logic from method body (first comment or logic hint)
-      const businessLogic = this.extractMethodBusinessLogic(content, methodPosition + match[0].length);
+      // Extract method body for business logic detection (only for concrete methods)
+      let methodBody = '';
+      let businessLogic: string | undefined;
+      if (!isInterfaceMethod) {
+        const methodBodyStart = methodPosition + match[0].length;
+        methodBody = this.extractMethodBody(content, methodBodyStart);
+        businessLogic = methodBody ? detectOperationPatterns(methodBody).join('、') : undefined;
+      }
+      
+      // Auto-infer description if JSDoc is missing
+      const description = generateMethodBusinessDescription(
+        methodName,
+        methodBody || undefined,
+        jsDocDescription
+      );
 
       methods.push({
         name: methodName,
-        description,
+        description: description || inferMethodDescription(methodName),
         parameters,
         returnType: returnType || 'void',
         decorators,
@@ -1155,7 +1275,7 @@ export class CodeScanner {
     return methods;
   }
 
-  // Enhanced: Parse method parameters
+  // Enhanced: Parse method parameters with Spring annotation support
   private parseMethodParameters(paramsStr: string): ParameterInfo[] {
     if (!paramsStr.trim()) return [];
 
@@ -1167,25 +1287,59 @@ export class CodeScanner {
       const trimmed = part.trim();
       if (!trimmed) continue;
 
-      // TypeScript/JavaScript: @Decorator() name?: type = defaultValue
-      const tsParamMatch = trimmed.match(/(?:@\w+(?:\([^)]*\))?\s*)*(\w+)(\?)?:\s*([^=]+?)(?:\s*=\s*(.+))?$/);
-      if (tsParamMatch) {
-        params.push({
-          name: tsParamMatch[1],
-          type: tsParamMatch[3].trim(),
-          optional: !!tsParamMatch[2] || !!tsParamMatch[4],
-          defaultValue: tsParamMatch[4]?.trim(),
-        });
-        continue;
-      }
-
       // Java: @Annotation Type paramName or final Type paramName
-      const javaParamMatch = trimmed.match(/(?:@\w+(?:\([^)]*\))?\s*)*(final\s+)?([\w<>\[\]]+)\s+(\w+)/);
+      // Extract annotations with their full text (for parsing attributes)
+      const annotationMatches = trimmed.match(/@(\w+)(?:\([^)]*\))?/g) || [];
+      const decorators = annotationMatches.map(a => a.match(/@(\w+)/)?.[1] || '');
+      
+      // Determine parameter location and optional status from Spring annotations
+      let inLocation: ParameterInfo['in'] = undefined;
+      let isOptional = false;
+      let defaultValue: string | undefined = undefined;
+      
+      for (const annotation of annotationMatches) {
+        if (annotation.startsWith('@PathVariable')) {
+          inLocation = 'path';
+          // @PathVariable defaults to required=true, check for required=false
+          if (/required\s*=\s*false/.test(annotation)) {
+            isOptional = true;
+          }
+        } else if (annotation.startsWith('@RequestParam')) {
+          inLocation = 'query';
+          // @RequestParam defaults to required=true, unless:
+          // - required=false is specified
+          // - defaultValue is specified
+          if (/required\s*=\s*false/.test(annotation)) {
+            isOptional = true;
+          }
+          const defaultMatch = annotation.match(/defaultValue\s*=\s*["']([^"']*)["']/);
+          if (defaultMatch) {
+            isOptional = true;
+            defaultValue = defaultMatch[1];
+          }
+        } else if (annotation.startsWith('@RequestHeader')) {
+          inLocation = 'header';
+          if (/required\s*=\s*false/.test(annotation)) {
+            isOptional = true;
+          }
+        } else if (annotation.startsWith('@RequestBody')) {
+          inLocation = 'body';
+          if (/required\s*=\s*false/.test(annotation)) {
+            isOptional = true;
+          }
+        }
+      }
+      
+      // Extract type and name (after removing annotations)
+      const javaParamMatch = trimmed.match(/(?:@\w+(?:\([^)]*\))?\s*)*(final\s+)?([\w<>\[\]]+)\s+(\w+)$/);
       if (javaParamMatch) {
         params.push({
           name: javaParamMatch[3],
           type: javaParamMatch[2].trim(),
-          optional: false,
+          optional: isOptional,
+          defaultValue,
+          decorators: decorators.length > 0 ? decorators : undefined,
+          in: inLocation,
         });
       }
     }
@@ -1216,6 +1370,27 @@ export class CodeScanner {
     if (current) parts.push(current);
 
     return parts;
+  }
+
+  // Extract method body content (up to a reasonable length)
+  private extractMethodBody(content: string, startPosition: number): string {
+    const maxLength = 500; // Maximum characters to scan
+    const scanContent = content.substring(startPosition, startPosition + maxLength);
+    
+    // Find the method body (until matching closing brace or maxLength)
+    let depth = 1;
+    let pos = 0;
+    let bodyContent = '';
+    
+    while (pos < scanContent.length && depth > 0 && bodyContent.length < 400) {
+      const char = scanContent[pos];
+      if (char === '{') depth++;
+      else if (char === '}') depth--;
+      if (depth > 0) bodyContent += char;
+      pos++;
+    }
+
+    return bodyContent;
   }
 
   // Enhanced: Extract business logic hint from method body
@@ -1278,71 +1453,119 @@ export class CodeScanner {
     return logicIndicators.length > 0 ? logicIndicators.join('、') : undefined;
   }
 
-  // Enhanced: Extract dependencies from constructor
+  // Enhanced: Extract dependencies from constructor and injection annotations
+  // Java-only: Only extract from @Autowired/@Resource/@Inject, NOT from method calls
   private extractDependencies(content: string): string[] {
     const dependencies = new Set<string>();
+
+    // Java: Field injection with @Autowired, @Resource, @Inject
+    const javaInjectionPattern = /(?:@Autowired|@Resource|@Inject)\s*(?:\([^)]*\))?\s*(?:private|public|protected)?\s+([\w<>\[\],\s.]+)\s+(\w+)\s*;/g;
+    let javaMatch;
+    while ((javaMatch = javaInjectionPattern.exec(content)) !== null) {
+      const type = javaMatch[1];
+      this.extractTypeFromGeneric(type, dependencies);
+    }
     
-    // TypeScript/JavaScript: Constructor injection pattern
-    const constructorMatch = content.match(/constructor\s*\(([^)]*)\)/s);
+    // Java: Constructor injection (common in Spring)
+    // Pattern: public ClassName(ServiceA a, ServiceB b) { ... }
+    const constructorPattern = /public\s+(\w+)\s*\(([^)]*)\)\s*\{/;
+    const constructorMatch = content.match(constructorPattern);
     if (constructorMatch) {
-      const paramsStr = constructorMatch[1];
+      const paramsStr = constructorMatch[2];
       const paramParts = this.splitParameters(paramsStr);
       
       for (const part of paramParts) {
-        // Match: private readonly serviceName: ServiceType
-        const depMatch = part.match(/(?:private|public|protected)?\s*(?:readonly)?\s*(\w+):\s*(\w+)/m);
+        // Match: Type paramName or final Type paramName
+        const depMatch = part.trim().match(/(?:final\s+)?([\w<>\[\],\s.]+)\s+\w+$/);
         if (depMatch) {
-          dependencies.add(depMatch[2]);
+          const type = depMatch[1];
+          this.extractTypeFromGeneric(type, dependencies);
         }
       }
     }
 
-    // Java: Field injection with @Autowired, @Resource, @Inject
-    const javaInjectionPattern = /(?:@Autowired|@Resource|@Inject)\s*(?:\([^)]*\))?\s*(?:private|public|protected)?\s+([\w<>\[\]]+)\s+(\w+)\s*;/g;
-    let javaMatch;
-    while ((javaMatch = javaInjectionPattern.exec(content)) !== null) {
-      const type = javaMatch[1];
-      // Extract generic type if present (e.g., List<User> -> User)
-      const genericMatch = type.match(/([\w]+)<([\w]+)>/);
-      if (genericMatch) {
-        dependencies.add(genericMatch[2]); // Inner type
+    // Filter out common Java types that are not actual dependencies
+    const excludeTypes = new Set([
+      'String', 'Integer', 'Long', 'Double', 'Float', 'Boolean', 'Byte', 'Short', 'Character',
+      'List', 'Set', 'Map', 'Collection', 'Optional', 'Object', 'Class',
+      'void', 'int', 'long', 'double', 'float', 'boolean', 'byte', 'short', 'char'
+    ]);
+    
+    return Array.from(dependencies).filter(d => d.length > 0 && !excludeTypes.has(d));
+  }
+
+  // Helper: Extract dependency types from generic type declarations
+  // e.g., Map<String, com.xx.UserDTO> -> UserDTO, List<User> -> User
+  private extractTypeFromGeneric(type: string, dependencies: Set<string>): void {
+    let t = type.replace(/\s+/g, '').replace(/\[\]$/g, '');
+    // Remove wildcards: ? extends X, ? super X, ?
+    t = t.replace(/\?\s*extends\s*/g, '').replace(/\?\s*super\s*/g, '').replace(/\?/g, '');
+    
+    // Get the content inside outermost <>
+    const outerMatch = t.match(/<(.+)>/);
+    if (outerMatch) {
+      // Split by comma but respect nested <>
+      const args = this.splitGenericArgs(outerMatch[1]);
+      // Get last argument (e.g., for Map<K,V> we want V)
+      t = args[args.length - 1] || t;
+    }
+    
+    // Strip remaining nested generics iteratively
+    while (/<[^<>]*>/.test(t)) {
+      t = t.replace(/<[^<>]*>/g, '');
+    }
+    
+    // Get simple name (remove package prefix)
+    const simpleName = t.split('.').pop()!.replace(/\[\]$/g, '').trim();
+    if (simpleName && /^[A-Z]/.test(simpleName)) {
+      dependencies.add(simpleName);
+    }
+  }
+  
+  /**
+   * Split generic arguments respecting nested <>
+   */
+  private splitGenericArgs(content: string): string[] {
+    const args: string[] = [];
+    let depth = 0;
+    let current = '';
+    
+    for (const char of content) {
+      if (char === '<') {
+        depth++;
+        current += char;
+      } else if (char === '>') {
+        depth--;
+        current += char;
+      } else if (char === ',' && depth === 0) {
+        args.push(current.trim());
+        current = '';
       } else {
-        dependencies.add(type);
+        current += char;
       }
     }
-
-    // Java: Extract from method calls (common patterns)
-    // Pattern: someService.methodName() or this.someService.methodName()
-    const methodCallPattern = /(?:this\.)?([a-z][\w]*)\.(\w+)\(/g;
-    let callMatch;
-    const potentialDeps = new Set<string>();
-    while ((callMatch = methodCallPattern.exec(content)) !== null) {
-      const fieldName = callMatch[1];
-      // Convert field name to class name (e.g., userService -> UserService)
-      if (fieldName.length > 3 && !['this', 'super', 'null'].includes(fieldName)) {
-        const className = fieldName.charAt(0).toUpperCase() + fieldName.slice(1);
-        potentialDeps.add(className);
-      }
+    
+    if (current.trim()) {
+      args.push(current.trim());
     }
-
-    // Add potential dependencies that match known class patterns
-    for (const dep of potentialDeps) {
-      if (dep.endsWith('Service') || dep.endsWith('Manager') || 
-          dep.endsWith('Repository') || dep.endsWith('Mapper') ||
-          dep.endsWith('Api') || dep.endsWith('Dao')) {
-        dependencies.add(dep);
-      }
-    }
-
-    return Array.from(dependencies).filter(d => d.length > 0);
+    
+    return args;
   }
 
   // Enhanced: Build complete API documentation
   private buildApiDocumentation(): void {
     for (const controller of this.controllers) {
-      // Extract controller base path
+      // Extract controller base path from file content
       const controllerClass = this.allClasses.find(c => c.name === controller.name);
-      const controllerPath = this.extractControllerPath(controllerClass?.decorators || []) || '';
+      // Read file content for controller path extraction
+      const controllerFilePath = join(this.options.rootDir, controller.filePath);
+      let controllerContent = '';
+      try {
+        controllerContent = readFileSync(controllerFilePath, 'utf-8');
+      } catch (e) {
+        // Silent fail
+      }
+      const controllerPath = this.extractControllerPath(controllerClass?.decorators || [], controllerContent) || '';
 
       for (const route of controller.routes) {
         const fullPath = this.joinPaths(controllerPath, route.path);
@@ -1358,8 +1581,8 @@ export class CodeScanner {
           controller: controller.name,
           controllerPath: controller.filePath,
           description: methodInfo?.description,
-          parameters: this.extractApiParameters(methodInfo),
-          requestBody: this.extractRequestBody(methodInfo),
+          parameters: this.extractApiParameters(methodInfo, fullPath, route.method),
+          requestBody: this.extractRequestBody(methodInfo, route.method),
           responses: this.inferApiResponses(methodInfo),
           decorators: methodInfo?.decorators || [],
         };
@@ -1369,10 +1592,42 @@ export class CodeScanner {
     }
   }
 
-  private extractControllerPath(decorators: string[]): string | undefined {
-    // Controller path is usually the first argument to @Controller
-    // This is a simplified extraction
-    return undefined; // Full implementation would parse decorator arguments
+  private extractControllerPath(decorators: string[], content?: string): string | undefined {
+    // Java Spring: Extract base path from @RequestMapping on class level
+    if (content) {
+      return this.extractSpringControllerBasePath(content);
+    }
+    // Fallback for NestJS style
+    return undefined;
+  }
+
+  /**
+   * Extract Spring controller base path from class-level @RequestMapping
+   * Handles: @RequestMapping("/api/users") or @RequestMapping(value="/api/users")
+   * Also supports: @RequestMapping({"/a", "/b"}) - takes first path
+   */
+  private extractSpringControllerBasePath(content: string): string {
+    // Match class/interface declaration with all preceding annotations
+    // The annotations are PART of the classMatch, not before it
+    const classMatch = content.match(/(?:@\w+(?:\([^)]*\))?\s*)*(?:public\s+)?(?:abstract\s+)?(?:class|interface)\s+\w+/);
+    if (!classMatch) return '';
+    
+    const header = classMatch[0];
+    
+    // Look for @RequestMapping in the class header annotations
+    // Pattern 1: @RequestMapping("/path") or @RequestMapping(value="/path")
+    const m1 = header.match(/@RequestMapping\s*\(\s*(?:value\s*=\s*)?["']([^"']+)["']/);
+    if (m1) return m1[1];
+    
+    // Pattern 2: @RequestMapping(path="/path")
+    const m2 = header.match(/@RequestMapping\s*\([^)]*\bpath\s*=\s*["']([^"']+)["']/);
+    if (m2) return m2[1];
+    
+    // Pattern 3: @RequestMapping({"/a", "/b"}) - array of paths, take first
+    const m3 = header.match(/@RequestMapping\s*\(\s*(?:value\s*=\s*)?\{\s*["']([^"']+)["']/);
+    if (m3) return m3[1];
+    
+    return '';
   }
 
   private joinPaths(base: string, path: string): string {
@@ -1381,19 +1636,138 @@ export class CodeScanner {
     return `/${cleanBase}${cleanBase && cleanPath ? '/' : ''}${cleanPath}`;
   }
 
-  private extractApiParameters(methodInfo?: ClassMethodInfo): ApiParameter[] {
+  // Helper: Normalize type for comparison (strip generics, arrays, whitespace)
+  // Uses iterative approach to handle nested generics like List<List<User>>
+  private normalizeType(type: string): string {
+    let t = type.replace(/\s+/g, '').replace(/\[\]$/g, '');
+    // Iteratively remove innermost generics until none remain
+    while (true) {
+      const next = t.replace(/<[^<>]*>/g, '');
+      if (next === t) break;
+      t = next;
+    }
+    return t;
+  }
+
+  // Helper: Check if type is a simple Java type (primitives, wrappers, String, Date, etc.)
+  private isSimpleJavaType(type: string): boolean {
+    const normalized = this.normalizeType(type);
+    const simpleTypes = [
+      'String', 'Integer', 'Long', 'Short', 'Byte', 'Float', 'Double', 'Boolean', 'Character',
+      'int', 'long', 'short', 'byte', 'float', 'double', 'boolean', 'char',
+      'BigDecimal', 'BigInteger', 'Date', 'LocalDate', 'LocalDateTime', 'LocalTime',
+      'Instant', 'ZonedDateTime', 'UUID'
+    ];
+    return simpleTypes.includes(normalized);
+  }
+
+  // Helper: Check if type is a collection type
+  private isCollectionType(type: string): boolean {
+    // Remove whitespace for consistent matching
+    const t = type.replace(/\s+/g, '');
+    const normalized = this.normalizeType(type);
+    
+    // Check for common collection patterns (including fully qualified names)
+    return t.startsWith('List<') || t.includes('.List<') ||
+           t.startsWith('Set<') || t.includes('.Set<') ||
+           t.startsWith('Collection<') || t.includes('.Collection<') ||
+           t.startsWith('Map<') || t.includes('.Map<') ||
+           t.endsWith('[]') ||
+           normalized === 'List' || normalized === 'Set' || normalized === 'Collection' || normalized === 'Map';
+  }
+
+  // Helper: Check if type is a complex object (likely body candidate)
+  private isComplexType(type: string): boolean {
+    const normalized = this.normalizeType(type);
+    // Exclude Spring framework types (check both normalized and original for generics like List<MultipartFile>)
+    const excludedTypes = ['Object', 'Void', 'void', 'BindingResult', 'Errors', 'MultipartFile'];
+    if (excludedTypes.includes(normalized) || type.includes('MultipartFile')) return false;
+    if (type.startsWith('HttpServlet') || type.startsWith('Model') || type.includes('HttpServlet')) return false;
+    
+    return !this.isSimpleJavaType(type) && !this.isCollectionType(type);
+  }
+
+  private extractApiParameters(methodInfo?: ClassMethodInfo, routePath?: string, httpMethod?: string): ApiParameter[] {
     if (!methodInfo) return [];
 
+    // Extract path variables from route path
+    // Supports both {id} (Spring/OpenAPI) and :id (Express/Swagger) formats
+    const pathVariables = new Set<string>();
+    if (routePath) {
+      // Match {paramName} format
+      const matches1 = routePath.matchAll(/\{(\w+)\}/g);
+      for (const match of matches1) {
+        pathVariables.add(match[1].toLowerCase());
+      }
+      // Match :paramName format
+      const matches2 = routePath.matchAll(/:(\w+)/g);
+      for (const match of matches2) {
+        pathVariables.add(match[1].toLowerCase());
+      }
+    }
+
+    const isWriteMethod = httpMethod && ['POST', 'PUT', 'PATCH'].includes(httpMethod.toUpperCase());
     const params: ApiParameter[] = [];
+    let foundBodyParam = false;
+    
+    // First pass: find if any param is explicitly marked as body
+    for (const param of methodInfo.parameters) {
+      if (param.in === 'body') {
+        foundBodyParam = true;
+        break;
+      }
+    }
     
     for (const param of methodInfo.parameters) {
-      // Determine parameter location based on decorators or naming conventions
-      let inLocation: ApiParameter['in'] = 'query';
+      // Use annotation-based location if available
+      let inLocation: ApiParameter['in'] = param.in || 'query';
       
-      if (param.name.toLowerCase().includes('id') || param.name.toLowerCase().includes('param')) {
-        inLocation = 'path';
-      } else if (param.type.includes('Dto') || param.type.includes('Body')) {
-        inLocation = 'body';
+      // Fallback heuristics if no annotation detected
+      if (!param.in) {
+        const paramNameLower = param.name.toLowerCase();
+        const paramType = param.type;
+        
+        // 1. Check if param name matches a path variable in the route (ONLY way to be path without annotation)
+        if (pathVariables.has(paramNameLower)) {
+          inLocation = 'path';
+        }
+        // 2. Body types by naming: DTO, VO, Request, Command, Form, etc. (ONLY for write methods)
+        else if (isWriteMethod && (
+          paramType.includes('Dto') || paramType.includes('DTO') ||
+          paramType.includes('VO') || paramType.includes('Vo') ||
+          paramType.includes('Request') || paramType.includes('Command') ||
+          paramType.includes('Form') || paramType.includes('Body') ||
+          paramType.includes('Cmd') ||
+          (paramType.includes('Param') && !paramType.includes('String'))
+        )) {
+          inLocation = 'body';
+        }
+        // 3. For POST/PUT/PATCH: complex type without explicit body -> likely body
+        else if (isWriteMethod && !foundBodyParam && this.isComplexType(paramType)) {
+          inLocation = 'body';
+          foundBodyParam = true; // Only assign first complex type as body
+        }
+        // 4. Pagination/sorting params -> query
+        else if (
+          paramNameLower === 'page' || paramNameLower === 'pagenum' ||
+          paramNameLower === 'size' || paramNameLower === 'pagesize' ||
+          paramNameLower === 'sort' || paramNameLower === 'order' ||
+          paramNameLower === 'limit' || paramNameLower === 'offset'
+        ) {
+          inLocation = 'query';
+        }
+        // 5. Simple types -> query
+        else if (this.isSimpleJavaType(paramType)) {
+          inLocation = 'query';
+        }
+        // 6. Collection types -> query
+        else if (this.isCollectionType(paramType)) {
+          inLocation = 'query';
+        }
+        // 7. Default: query (safer than guessing path, and GET/DELETE complex objects go here)
+        else {
+          inLocation = 'query';
+        }
       }
 
       params.push({
@@ -1408,18 +1782,42 @@ export class CodeScanner {
     return params;
   }
 
-  private extractRequestBody(methodInfo?: ClassMethodInfo): ApiRequestBody | undefined {
+  private extractRequestBody(methodInfo?: ClassMethodInfo, httpMethod?: string): ApiRequestBody | undefined {
     if (!methodInfo) return undefined;
 
-    // Find body parameter (usually a DTO)
-    const bodyParam = methodInfo.parameters.find(p => 
-      p.type.includes('Dto') || p.type.includes('Body') || p.type.includes('Request')
-    );
+    const isWriteMethod = httpMethod && ['POST', 'PUT', 'PATCH'].includes(httpMethod.toUpperCase());
+
+    // Priority 1: Find parameter with in === 'body' (from @RequestBody annotation)
+    let bodyParam = methodInfo.parameters.find(p => p.in === 'body');
+    
+    // GET/DELETE should not have request body unless explicitly annotated with @RequestBody
+    if (!isWriteMethod && !bodyParam) {
+      return undefined;
+    }
+    
+    // Priority 2: Fallback to type naming patterns (DTO, Body, Request, etc.) - ONLY for write methods
+    if (!bodyParam && isWriteMethod) {
+      bodyParam = methodInfo.parameters.find(p => 
+        p.type.includes('Dto') || p.type.includes('DTO') || 
+        p.type.includes('Body') || p.type.includes('Request') ||
+        p.type.includes('Command') || p.type.includes('Form') ||
+        p.type.includes('Cmd')
+      );
+    }
+    
+    // Priority 3: For POST/PUT/PATCH, find the unique complex object
+    if (!bodyParam && isWriteMethod) {
+      const complexParams = methodInfo.parameters.filter(p => this.isComplexType(p.type));
+      // Only use if there's exactly one complex object (avoid ambiguity)
+      if (complexParams.length === 1) {
+        bodyParam = complexParams[0];
+      }
+    }
 
     if (!bodyParam) return undefined;
 
     // Find the DTO class to get its fields
-    const dtoClass = this.allClasses.find(c => c.name === bodyParam.type);
+    const dtoClass = this.allClasses.find(c => c.name === bodyParam!.type);
 
     return {
       type: bodyParam.type,
@@ -1531,10 +1929,11 @@ export class CodeScanner {
     const patternCounts = new Map<string, { count: number; examples: string[] }>();
 
     for (const fileName of this.fileNames) {
-      // Detect pattern like *.entity.ts, *.service.ts
-      const match = fileName.match(/\.(\w+)\.(ts|js)$/);
+      // Java patterns: *Controller.java, *Service.java, *ServiceImpl.java, *Mapper.java, *DTO.java, etc.
+      const match = fileName.match(/(\w+)(Controller|Service|ServiceImpl|Mapper|Repository|DAO|Dao|DTO|Dto|VO|Vo|DO|Entity|Impl)\.java$/);
       if (match) {
-        const pattern = `*.${match[1]}.${match[2]}`;
+        const suffix = match[2];
+        const pattern = `*${suffix}.java`;
         const existing = patternCounts.get(pattern) || { count: 0, examples: [] };
         existing.count++;
         if (existing.examples.length < 3) {
@@ -1837,6 +2236,12 @@ export class CodeScanner {
    * Enhanced: Extract table name from @Table annotation or class name
    */
   private extractTableName(content: string, className: string): string | undefined {
+    // MyBatis-Plus: @TableName("table_name") or @TableName(value = "table_name")
+    const mpTableMatch = content.match(/@TableName\s*\(\s*(?:value\s*=\s*)?["']([^"']+)["']/);
+    if (mpTableMatch) {
+      return mpTableMatch[1];
+    }
+    
     // Java JPA: @Table(name = "table_name")
     const tableMatch = content.match(/@Table\s*\(\s*name\s*=\s*["']([^"']+)["']/);
     if (tableMatch) {
@@ -1886,6 +2291,12 @@ export class CodeScanner {
    * Enhanced: Extract primary key field
    */
   private extractPrimaryKey(content: string, fields: FieldInfo[]): string | undefined {
+    // MyBatis-Plus: @TableId annotation
+    const mpIdMatch = content.match(/@TableId[\s\S]*?(?:private|public|protected)\s+[\w<>\[\]]+\s+(\w+)/);
+    if (mpIdMatch) {
+      return mpIdMatch[1];
+    }
+    
     // Java JPA: @Id annotation
     const idMatch = content.match(/@Id[\s\S]*?(?:private|public|protected)\s+[\w<>\[\]]+\s+(\w+)/);
     if (idMatch) {
@@ -1938,7 +2349,7 @@ export class CodeScanner {
       if (fieldMatch) {
         const fieldDecl = fieldMatch[0];
 
-        // Extract @Column annotation
+        // Extract @Column annotation (JPA)
         const columnMatch = fieldDecl.match(/@Column\s*\(([^)]+)\)/);
         if (columnMatch) {
           const columnAttrs = columnMatch[1];
@@ -1961,6 +2372,29 @@ export class CodeScanner {
             enhancedField.nullable = nullableMatch[1] === 'true';
           }
         }
+        
+        // Extract @TableField annotation (MyBatis-Plus)
+        // Support multi-line annotations: @TableField(value = "xxx", fill = ...)
+        const tableFieldValueMatch = fieldDecl.match(/@TableField[\s\S]*?value\s*=\s*["']([^"']+)["']/);
+        const tableFieldSimpleMatch = fieldDecl.match(/@TableField\s*\(\s*["']([^"']+)["']/);
+        const tableFieldValue = tableFieldValueMatch?.[1] || tableFieldSimpleMatch?.[1];
+        if (tableFieldValue && !enhancedField.columnName) {
+          enhancedField.columnName = tableFieldValue;
+        }
+        
+        // Extract @TableId annotation (MyBatis-Plus)
+        // Support multi-line annotations
+        const tableIdValueMatch = fieldDecl.match(/@TableId[\s\S]*?value\s*=\s*["']([^"']+)["']/);
+        const tableIdSimpleMatch = fieldDecl.match(/@TableId\s*\(\s*["']([^"']+)["']/);
+        const tableIdValue = tableIdValueMatch?.[1] || tableIdSimpleMatch?.[1];
+        if (tableIdValue && !enhancedField.columnName) {
+          enhancedField.columnName = tableIdValue;
+        }
+        
+        // Mark non-table fields (MyBatis-Plus exist=false)
+        if (/@TableField\s*\([^)]*exist\s*=\s*false/i.test(fieldDecl)) {
+          enhancedField.comment = (enhancedField.comment ? enhancedField.comment + '；' : '') + '非表字段';
+        }
 
         // Extract field comment from JavaDoc
         const beforeField = content.substring(0, content.indexOf(fieldMatch[0]));
@@ -1971,7 +2405,10 @@ export class CodeScanner {
             .map(l => l.replace(/^\s*\*\s*/, '').trim())
             .filter(l => l && !l.startsWith('@'));
           if (commentLines.length > 0) {
-            enhancedField.comment = commentLines[0];
+            // Append to existing comment (e.g., "非表字段") instead of overwriting
+            enhancedField.comment = enhancedField.comment
+              ? `${commentLines[0]}；${enhancedField.comment}`
+              : commentLines[0];
           }
         }
       }
@@ -1993,6 +2430,214 @@ export class CodeScanner {
       .replace(/([A-Z])/g, '_$1')
       .toLowerCase()
       .replace(/^_/, '');
+  }
+
+  /**
+   * Scan MyBatis mapper XML file
+   */
+  private scanMyBatisXml(filePath: string): void {
+    try {
+      const content = readFileSync(filePath, 'utf-8');
+      
+      // Check if this is a MyBatis mapper XML
+      if (!content.includes('<mapper') || !content.includes('namespace')) {
+        return;
+      }
+      
+      // Extract namespace
+      const namespaceMatch = content.match(/<mapper\s+namespace\s*=\s*["']([^"']+)["']/);
+      if (!namespaceMatch) {
+        return;
+      }
+      
+      const namespace = namespaceMatch[1];
+      const statements: MyBatisStatement[] = [];
+      
+      // Extract select/insert/update/delete statements using complete block matching
+      // This handles self-closing tags and avoids issues with indexOf
+      const statementTypes = ['select', 'insert', 'update', 'delete'];
+      for (const type of statementTypes) {
+        // Match complete block: <type id="..." ...>...</type> or self-closing <type id="..." .../>
+        const blockPattern = new RegExp(`<${type}\\s+id\\s*=\\s*["']([^"']+)["']([^>]*)(?:/>|>[\\s\\S]*?</${type}>)`, 'gi');
+        let match;
+        
+        while ((match = blockPattern.exec(content)) !== null) {
+          const id = match[1];
+          const attrs = match[2];
+          const fullBlock = match[0];
+          
+          // Extract resultType/parameterType
+          const resultTypeMatch = attrs.match(/resultType\s*=\s*["']([^"']+)["']/);
+          const parameterTypeMatch = attrs.match(/parameterType\s*=\s*["']([^"']+)["']/);
+          
+          // Extract table names from the complete SQL block
+          const tables = this.extractTablesFromSql(fullBlock);
+          
+          statements.push({
+            id,
+            type: type as 'select' | 'insert' | 'update' | 'delete',
+            resultType: resultTypeMatch?.[1],
+            parameterType: parameterTypeMatch?.[1],
+            tables: tables.length > 0 ? tables : undefined,
+          });
+        }
+      }
+      
+      if (statements.length > 0) {
+        this.mybatisMappers.push({
+          namespace,
+          filePath: relative(this.options.rootDir, filePath),
+          statements,
+        });
+        // Note: Don't link immediately - wait until all files are scanned
+        // linkAllMyBatisToMappers() will be called in scan()
+      }
+    } catch (error) {
+      // Silent fail for non-mapper XML files
+    }
+  }
+
+  /**
+   * Extract table names from SQL statement (handles schema, alias, backticks)
+   */
+  private extractTablesFromSql(sql: string): string[] {
+    const tables = new Set<string>();
+    
+    // Strip XML tags first to avoid false positives from <include>, <where>, etc.
+    const plainSql = sql.replace(/<[^>]+>/g, ' ');
+    
+    // Match FROM/JOIN/INTO/UPDATE/DELETE FROM table patterns
+    // Handles: t_user, `t_user`, db.t_user, db.`t_user`, t_user u (alias)
+    const patterns = [
+      /\bFROM\s+(?:`?([\w_]+)`?\.)?`?([\w_]+)`?(?:\s+(?:AS\s+)?\w+)?/gi,
+      /\bJOIN\s+(?:`?([\w_]+)`?\.)?`?([\w_]+)`?(?:\s+(?:AS\s+)?\w+)?/gi,
+      /\bINTO\s+(?:`?([\w_]+)`?\.)?`?([\w_]+)`?/gi,
+      /\bUPDATE\s+(?:`?([\w_]+)`?\.)?`?([\w_]+)`?/gi,
+      /\bDELETE\s+FROM\s+(?:`?([\w_]+)`?\.)?`?([\w_]+)`?/gi,
+    ];
+    
+    for (const pattern of patterns) {
+      let match;
+      while ((match = pattern.exec(plainSql)) !== null) {
+        // match[2] is the actual table name (after optional schema)
+        const tableName = (match[2] || match[1] || '').toLowerCase();
+        // Filter out common SQL keywords that might be false positives
+        if (tableName && !['select', 'where', 'set', 'values', 'and', 'or'].includes(tableName)) {
+          tables.add(tableName);
+        }
+      }
+    }
+    
+    return Array.from(tables);
+  }
+
+  /**
+   * Link all MyBatis XML mappers to corresponding Mapper interfaces
+   * Called after all files are scanned to avoid order dependency
+   */
+  private linkAllMyBatisToMappers(): void {
+    for (const mapper of this.mybatisMappers) {
+      this.linkMyBatisToMapper(mapper.namespace, mapper.statements);
+    }
+  }
+
+  /**
+   * Correct class types based on annotations (more reliable than file names)
+   * Called after all files are scanned
+   */
+  private correctClassTypesByAnnotations(): void {
+    for (const classInfo of this.allClasses) {
+      const decorators = classInfo.decorators;
+      const extendsClass = classInfo.extends || '';
+      const implementsList = classInfo.implements || [];
+      
+      // Repository: @Mapper, @Repository, or extends *BaseMapper (MyBatis-Plus)
+      // Note: interface extends BaseMapper goes to extendsClass, not implementsList
+      if (decorators.includes('Mapper') || decorators.includes('Repository') || 
+          extendsClass.endsWith('BaseMapper')) {
+        classInfo.type = 'repository';
+        continue;
+      }
+      
+      // Controller: @RestController, @Controller
+      if (decorators.includes('RestController') || decorators.includes('Controller')) {
+        classInfo.type = 'controller';
+        continue;
+      }
+      
+      // Service: @Service > extends *ServiceImpl > implements IService > *Service naming (lower priority)
+      // More strict: avoid false positives like ServiceFactory, ServiceProvider
+      if (decorators.includes('Service')) {
+        classInfo.type = 'service';
+        continue;
+      }
+      if (extendsClass.endsWith('ServiceImpl')) {
+        classInfo.type = 'service';
+        continue;
+      }
+      // IService is MP's core interface
+      if (implementsList.some(i => i === 'IService' || i.startsWith('IService'))) {
+        classInfo.type = 'service';
+        continue;
+      }
+      // Fallback: class name ends with Service/ServiceImpl (not just implements *Service)
+      if (classInfo.name.endsWith('Service') || classInfo.name.endsWith('ServiceImpl')) {
+        // But exclude Factory/Provider/Listener patterns
+        if (!classInfo.name.includes('Factory') && !classInfo.name.includes('Provider') && 
+            !classInfo.name.includes('Listener') && !classInfo.name.includes('Handler')) {
+          classInfo.type = 'service';
+          continue;
+        }
+      }
+      
+      // @Component: Only set to utility if class name suggests utility (Util/Helper)
+      // Otherwise keep original type to avoid misclassifying handlers, listeners, etc.
+      if (decorators.includes('Component')) {
+        const className = classInfo.name;
+        if (className.includes('Util') || className.includes('Helper') || className.includes('Utils')) {
+          classInfo.type = 'utility';
+        }
+        // Otherwise keep the original type (don't change)
+        continue;
+      }
+    }
+  }
+
+  /**
+   * Link MyBatis XML info to corresponding Mapper interface methods
+   */
+  private linkMyBatisToMapper(namespace: string, statements: MyBatisStatement[]): void {
+    // Find the corresponding Mapper class by namespace
+    const mapperClass = this.allClasses.find(c => {
+      // Namespace is usually the full class name
+      const className = namespace.split('.').pop();
+      return c.name === className && (c.decorators.includes('Mapper') || c.type === 'repository');
+    });
+    
+    if (!mapperClass) return;
+    
+    // Enhance method descriptions with MyBatis info
+    for (const method of mapperClass.methods) {
+      const statement = statements.find(s => s.id === method.name);
+      if (statement) {
+        const sqlTypeMap = {
+          select: 'MyBatis查询',
+          insert: 'MyBatis插入',
+          update: 'MyBatis更新',
+          delete: 'MyBatis删除',
+        };
+        
+        let mybatisInfo = sqlTypeMap[statement.type];
+        if (statement.tables?.length) {
+          mybatisInfo += `(表: ${statement.tables.join(', ')})`;
+        }
+        
+        // Append to existing businessLogic or set new
+        method.businessLogic = method.businessLogic 
+          ? `${method.businessLogic}、${mybatisInfo}` 
+          : mybatisInfo;
+      }
+    }
   }
 }
 
