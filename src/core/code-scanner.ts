@@ -2011,34 +2011,67 @@ export class CodeScanner {
 
   private analyzeMavenProject(rootDir: string): void {
     try {
-      const pomPath = join(rootDir, 'pom.xml');
-      const pomContent = readFileSync(pomPath, 'utf-8');
-      
-      // Extract modules from parent POM
-      const moduleMatches = pomContent.matchAll(/<module>([^<]+)<\/module>/g);
-      
-      for (const match of moduleMatches) {
-        const moduleName = match[1];
-        const modulePath = join(rootDir, moduleName);
-        
-        if (existsSync(modulePath)) {
-          const moduleType = this.inferModuleType(moduleName);
-          const packageName = this.extractJavaPackage(modulePath);
-          
-          this.projectModules.push({
-            name: moduleName,
-            path: relative(rootDir, modulePath),
-            type: moduleType,
-            packageName,
-            dependencies: [], // Will be filled later
-          });
-        }
-      }
+      // 递归扫描所有模块（包括子模块）
+      this.scanMavenModulesRecursive(rootDir, rootDir);
       
       // Analyze module dependencies
       this.analyzeModuleDependencies();
     } catch (error) {
       // Silent fail - not critical
+    }
+  }
+  
+  /**
+   * 递归扫描 Maven 模块，支持嵌套子模块
+   * @param currentDir 当前正在扫描的目录
+   * @param projectRoot 项目根目录（用于计算相对路径）
+   */
+  private scanMavenModulesRecursive(currentDir: string, projectRoot: string): void {
+    const pomPath = join(currentDir, 'pom.xml');
+    if (!existsSync(pomPath)) return;
+    
+    try {
+      const pomContent = readFileSync(pomPath, 'utf-8');
+      
+      // 提取当前 pom 中声明的模块
+      const moduleMatches = pomContent.matchAll(/<module>([^<]+)<\/module>/g);
+      const declaredModules: string[] = [];
+      
+      for (const match of moduleMatches) {
+        declaredModules.push(match[1]);
+      }
+      
+      if (declaredModules.length === 0) {
+        // 这是一个叶子模块（没有子模块），添加到模块列表
+        // 但跳过根目录本身（它通常是聚合 pom）
+        if (currentDir !== projectRoot) {
+          const moduleName = relative(projectRoot, currentDir);
+          const moduleType = this.inferModuleType(moduleName);
+          const packageName = this.extractJavaPackage(currentDir);
+          
+          // 检查是否已添加过（避免重复）
+          const alreadyExists = this.projectModules.some(m => m.path === moduleName);
+          if (!alreadyExists) {
+            this.projectModules.push({
+              name: moduleName,
+              path: moduleName,
+              type: moduleType,
+              packageName,
+              dependencies: [],
+            });
+          }
+        }
+      } else {
+        // 这是一个聚合模块，递归处理子模块
+        for (const subModule of declaredModules) {
+          const subModulePath = join(currentDir, subModule);
+          if (existsSync(subModulePath)) {
+            this.scanMavenModulesRecursive(subModulePath, projectRoot);
+          }
+        }
+      }
+    } catch (error) {
+      // Silent fail for individual module
     }
   }
 

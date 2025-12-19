@@ -1,4 +1,5 @@
 import path from 'path';
+import fs from 'fs/promises';
 import {
   createPrompt,
   isBackspaceKey,
@@ -426,12 +427,13 @@ export class InitCommand {
     );
 
     // Step 1: Create directory structure
+    let moduleNames: string[] = [];
     if (!extendMode) {
       const structureSpinner = this.startSpinner(
         'Creating CainiaoSpec structure...'
       );
       await this.createDirectoryStructure(openspecPath);
-      await this.generateFiles(openspecPath, config);
+      moduleNames = await this.generateFiles(openspecPath, config);
       structureSpinner.stopAndPersist({
         symbol: PALETTE.white('▌'),
         text: PALETTE.white('CainiaoSpec structure created'),
@@ -444,6 +446,8 @@ export class InitCommand {
       );
       await this.createDirectoryStructure(openspecPath);
       await this.ensureTemplateFiles(openspecPath, config);
+      // In extend mode, try to get module names from existing modules directory
+      moduleNames = await this.getExistingModuleNames(openspecPath);
     }
 
     // Step 2: Configure AI tools
@@ -466,7 +470,8 @@ export class InitCommand {
       skippedExisting,
       skipped,
       extendMode,
-      rootStubStatus
+      rootStubStatus,
+      moduleNames
     );
   }
 
@@ -732,8 +737,8 @@ export class InitCommand {
   private async generateFiles(
     openspecPath: string,
     config: OpenSpecConfig
-  ): Promise<void> {
-    await this.writeTemplateFiles(openspecPath, config, false);
+  ): Promise<string[]> {
+    const moduleNames = await this.writeTemplateFiles(openspecPath, config, false);
     
     // Generate QUICK_START.md in project root (not in cainiaospec/)
     const projectPath = path.dirname(openspecPath);
@@ -745,6 +750,8 @@ export class InitCommand {
     const stepByStepPath = path.join(projectPath, 'STEP_BY_STEP_DOC_PROMPT.md');
     const stepByStepContent = this.getStepByStepPromptContent();
     await FileSystemUtils.writeFile(stepByStepPath, stepByStepContent);
+    
+    return moduleNames;
   }
 
   private async ensureTemplateFiles(
@@ -798,7 +805,7 @@ export class InitCommand {
     openspecPath: string,
     config: OpenSpecConfig,
     skipExisting: boolean
-  ): Promise<void> {
+  ): Promise<string[]> {
     const context: ProjectContext = await this.buildProjectContext(
       path.dirname(openspecPath)
     );
@@ -826,6 +833,69 @@ export class InitCommand {
       const aiPromptPath = path.join(openspecPath, 'AI_COMPLETION_PROMPT.md');
       const aiPromptContent = generateAICompletionPrompt(context);
       await FileSystemUtils.writeFile(aiPromptPath, aiPromptContent);
+    }
+    
+    // Extract module names from scanned classes
+    return this.extractModuleNames(context.allClasses || []);
+  }
+
+  private extractModuleNames(allClasses: Array<{ filePath: string }>): string[] {
+    // Helper to extract module name from file path
+    const getModuleName = (filePath: string): string => {
+      // Try to get module name from path like src/main/java/com/xxx/module/...
+      const parts = filePath.split('/');
+      // Find 'java' and take the next meaningful segment after package structure
+      const javaIndex = parts.indexOf('java');
+      if (javaIndex >= 0 && javaIndex + 4 < parts.length) {
+        // Skip com/xxx/project -> get module name
+        return parts[javaIndex + 4] || 'main';
+      }
+      // Fallback: use parent directory name
+      return parts[parts.length - 2] || 'main';
+    };
+    
+    // Get unique module names
+    const moduleSet = new Set<string>();
+    for (const cls of allClasses) {
+      moduleSet.add(getModuleName(cls.filePath));
+    }
+    
+    // Filter out infrastructure/config modules that don't need documentation
+    const infraModulePatterns = [
+      'config', 'configuration', 'common', 'utils', 'util',
+      'core', 'base', 'framework', 'infrastructure', 'bootstrap',
+      'test', 'testutils', 'mock', 'starter'
+    ];
+    const isInfraModule = (name: string) => infraModulePatterns.some(pattern => 
+      name.toLowerCase().includes(pattern)
+    );
+    
+    return Array.from(moduleSet)
+      .filter(name => !isInfraModule(name))
+      .sort();
+  }
+
+  private async getExistingModuleNames(openspecPath: string): Promise<string[]> {
+    const modulesPath = path.join(openspecPath, 'modules');
+    try {
+      const exists = await FileSystemUtils.directoryExists(modulesPath);
+      if (!exists) {
+        return [];
+      }
+      
+      // Read directories in modules folder
+      const entries = await fs.readdir(modulesPath, { withFileTypes: true });
+      const moduleNames: string[] = [];
+      
+      for (const entry of entries) {
+        if (entry.isDirectory()) {
+          moduleNames.push(entry.name);
+        }
+      }
+      
+      return moduleNames.sort();
+    } catch {
+      return [];
     }
   }
 
@@ -927,7 +997,8 @@ export class InitCommand {
     skippedExisting: AIToolOption[],
     skipped: AIToolOption[],
     extendMode: boolean,
-    rootStubStatus: RootStubStatus
+    rootStubStatus: RootStubStatus,
+    moduleNames: string[] = []
   ): void {
     console.log(); // Empty line for spacing
     const successHeadline = extendMode
@@ -1019,6 +1090,33 @@ export class InitCommand {
     console.log(chalk.white('│ ') + chalk.yellow('按照其中的指引为项目补充完整的业务文档。') + chalk.white('      │'));
     console.log(chalk.white('└────────────────────────────────────────────────────────────┘'));
     console.log();
+    
+    // 为每个模块生成单独的补充提示词
+    if (moduleNames.length > 0) {
+      console.log(chalk.cyan('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
+      console.log(chalk.bgBlue.white(' 📦 分模块补充文档 '));
+      console.log(chalk.cyan('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
+      console.log();
+      console.log(chalk.green('如果一次性补充所有模块太多，可以分模块逐个补充：'));
+      console.log();
+      
+      for (const moduleName of moduleNames) {
+        console.log(chalk.white(`📁 ${moduleName} 模块：`));
+        console.log(chalk.white('┌────────────────────────────────────────────────────────────┐'));
+        console.log(chalk.white('│ ') + chalk.yellow(`请先阅读 cainiaospec/AGENTS.md 了解工作流程，`) + chalk.white('  │'));
+        console.log(chalk.white('│ ') + chalk.yellow(`然后打开 cainiaospec/modules/${moduleName}/ 目录，`) + chalk.white('    │'));
+        console.log(chalk.white('│ ') + chalk.yellow(`补充该模块的 README.md、controllers.md、`) + chalk.white('        │'));
+        console.log(chalk.white('│ ') + chalk.yellow(`services.md、models.md 中所有 [请补充] 的内容。`) + chalk.white('  │'));
+        console.log(chalk.white('└────────────────────────────────────────────────────────────┘'));
+        console.log();
+      }
+      
+      console.log(chalk.gray('💡 提示：每次只发送一个模块的提示词，AI 会专注补充该模块的文档'));
+      console.log();
+      console.log(chalk.cyan('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
+      console.log();
+    }
+    
     console.log(chalk.gray('AI 会了解：'));
     console.log(chalk.gray('✓ CainiaoSpec 的三阶段工作流（proposal/apply/archive）'));
     console.log(chalk.gray('✓ 如何读取模块文档理解业务逻辑'));
