@@ -98,7 +98,7 @@ export class ShowCommand {
 
     if (!params.typeOverride && isChange && isSpec) {
       console.error(`Ambiguous item '${itemName}' matches both a change and a spec.`);
-      console.error('Pass --type change|spec, or use: openspec change show / openspec spec show');
+      console.error('Pass --type change|spec, or use: cainiaospec change show / cainiaospec spec show');
       process.exitCode = 1;
       return;
     }
@@ -115,9 +115,9 @@ export class ShowCommand {
 
   private printNonInteractiveHint(): void {
     console.error('Nothing to show. Try one of:');
-    console.error('  openspec show <item>');
-    console.error('  openspec change show');
-    console.error('  openspec spec show');
+    console.error('  cainiaospec show <item>');
+    console.error('  cainiaospec change show');
+    console.error('  cainiaospec spec show');
     console.error('Or run in an interactive terminal.');
   }
 

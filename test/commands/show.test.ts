@@ -6,20 +6,34 @@ import { execSync } from 'child_process';
 describe('top-level show command', () => {
   const projectRoot = process.cwd();
   const testDir = path.join(projectRoot, 'test-show-command-tmp');
-  const changesDir = path.join(testDir, 'openspec', 'changes');
-  const specsDir = path.join(testDir, 'openspec', 'specs');
-  const openspecBin = path.join(projectRoot, 'bin', 'openspec.js');
+  const changesDir = path.join(testDir, 'cainiaospec', 'changes');
+  const specsDir = path.join(testDir, 'cainiaospec', 'specs');
+  const openspecBin = path.join(projectRoot, 'bin', 'cainiaospec.js');
 
 
   beforeEach(async () => {
     await fs.mkdir(changesDir, { recursive: true });
     await fs.mkdir(specsDir, { recursive: true });
 
-    const changeContent = `# Change: Demo\n\n## Why\nBecause reasons.\n\n## What Changes\n- **auth:** Add requirement\n`;
+    const changeContent = `# Change: Demo
+
+## Why
+Because reasons.
+
+## What Changes
+- **auth:** Add requirement
+`;
     await fs.mkdir(path.join(changesDir, 'demo'), { recursive: true });
     await fs.writeFile(path.join(changesDir, 'demo', 'proposal.md'), changeContent, 'utf-8');
 
-    const specContent = `## Purpose\nAuth spec.\n\n## Requirements\n\n### Requirement: User Authentication\nText\n`;
+    const specContent = `## Purpose
+Auth spec.
+
+## Requirements
+
+### Requirement: User Authentication
+Text
+`;
     await fs.mkdir(path.join(specsDir, 'auth'), { recursive: true });
     await fs.writeFile(path.join(specsDir, 'auth', 'spec.md'), specContent, 'utf-8');
   });
@@ -42,9 +56,9 @@ describe('top-level show command', () => {
       expect(err.status).not.toBe(0);
       const stderr = err.stderr.toString();
       expect(stderr).toContain('Nothing to show.');
-      expect(stderr).toContain('openspec show <item>');
-      expect(stderr).toContain('openspec change show');
-      expect(stderr).toContain('openspec spec show');
+      expect(stderr).toContain('cainiaospec show <item>');
+      expect(stderr).toContain('cainiaospec change show');
+      expect(stderr).toContain('cainiaospec spec show');
     } finally {
       process.chdir(originalCwd);
       process.env = originalEnv;

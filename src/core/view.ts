@@ -6,9 +6,9 @@ import { MarkdownParser } from './parsers/markdown-parser.js';
 
 export class ViewCommand {
   async execute(targetPath: string = '.'): Promise<void> {
-    const openspecDir = path.join(targetPath, 'openspec');
+    const cainiaospecDir = path.join(targetPath, 'cainiaospec');
     
-    if (!fs.existsSync(openspecDir)) {
+    if (!fs.existsSync(cainiaospecDir)) {
       console.error(chalk.red('No cainiaospec directory found'));
       process.exit(1);
     }
@@ -17,8 +17,8 @@ export class ViewCommand {
     console.log('═'.repeat(60));
 
     // Get changes and specs data
-    const changesData = await this.getChangesData(openspecDir);
-    const specsData = await this.getSpecsData(openspecDir);
+    const changesData = await this.getChangesData(cainiaospecDir);
+    const specsData = await this.getSpecsData(cainiaospecDir);
 
     // Display summary metrics
     this.displaySummary(changesData, specsData);
@@ -65,14 +65,14 @@ export class ViewCommand {
     }
 
     console.log('\n' + '═'.repeat(60));
-    console.log(chalk.dim(`\nUse ${chalk.white('openspec list --changes')} or ${chalk.white('openspec list --specs')} for detailed views`));
+    console.log(chalk.dim(`\nUse ${chalk.white('cainiaospec list --changes')} or ${chalk.white('cainiaospec list --specs')} for detailed views`));
   }
 
-  private async getChangesData(openspecDir: string): Promise<{
+  private async getChangesData(cainiaospecDir: string): Promise<{
     active: Array<{ name: string; progress: { total: number; completed: number } }>;
     completed: Array<{ name: string }>;
   }> {
-    const changesDir = path.join(openspecDir, 'changes');
+    const changesDir = path.join(cainiaospecDir, 'changes');
     
     if (!fs.existsSync(changesDir)) {
       return { active: [], completed: [] };
@@ -109,8 +109,8 @@ export class ViewCommand {
     return { active, completed };
   }
 
-  private async getSpecsData(openspecDir: string): Promise<Array<{ name: string; requirementCount: number }>> {
-    const specsDir = path.join(openspecDir, 'specs');
+  private async getSpecsData(cainiaospecDir: string): Promise<Array<{ name: string; requirementCount: number }>> {
+    const specsDir = path.join(cainiaospecDir, 'specs');
     
     if (!fs.existsSync(specsDir)) {
       return [];

@@ -6,13 +6,18 @@ import { execSync } from 'child_process';
 describe('change show (interactive behavior)', () => {
   const projectRoot = process.cwd();
   const testDir = path.join(projectRoot, 'test-change-show-tmp');
-  const changesDir = path.join(testDir, 'openspec', 'changes');
-  const bin = path.join(projectRoot, 'bin', 'openspec.js');
+  const changesDir = path.join(testDir, 'cainiaospec', 'changes');
+  const bin = path.join(projectRoot, 'bin', 'cainiaospec.js');
 
 
   beforeEach(async () => {
     await fs.mkdir(changesDir, { recursive: true });
-    const content = `# Change: Demo\n\n## Why\n\n## What Changes\n- x`;
+    const content = `# Change: Demo
+
+## Why
+
+## What Changes
+- x`;
     await fs.mkdir(path.join(changesDir, 'demo'), { recursive: true });
     await fs.writeFile(path.join(changesDir, 'demo', 'proposal.md'), content, 'utf-8');
   });
@@ -34,7 +39,7 @@ describe('change show (interactive behavior)', () => {
       expect(err).toBeDefined();
       expect(err.status).not.toBe(0);
       expect(err.stderr.toString()).toContain('Available IDs:');
-      expect(err.stderr.toString()).toContain('openspec change list');
+      expect(err.stderr.toString()).toContain('cainiaospec change list');
     } finally {
       process.chdir(originalCwd);
       process.env = originalEnv;

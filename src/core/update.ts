@@ -88,7 +88,7 @@ export class UpdateCommand {
     }
 
     const summaryParts: string[] = [];
-    const instructionFiles: string[] = ['openspec/AGENTS.md'];
+    const instructionFiles: string[] = ['cainiaospec/AGENTS.md'];
 
     if (updatedFiles.includes('AGENTS.md')) {
       instructionFiles.push(

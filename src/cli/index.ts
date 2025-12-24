@@ -9,6 +9,7 @@ import { UpdateCommand } from '../core/update.js';
 import { ListCommand } from '../core/list.js';
 import { ArchiveCommand } from '../core/archive.js';
 import { ViewCommand } from '../core/view.js';
+import { DocSyncCommand } from '../core/doc-sync.js';
 import { registerSpecCommand } from '../commands/spec.js';
 import { ChangeCommand } from '../commands/change.js';
 import { ValidateCommand } from '../commands/validate.js';
@@ -86,7 +87,7 @@ program
 
 program
   .command('update [path]')
-  .description('Update OpenSpec instruction files')
+  .description('Update CainiaoSpec instruction files')
   .action(async (targetPath = '.') => {
     try {
       const resolvedPath = path.resolve(targetPath);
@@ -130,6 +131,23 @@ program
     }
   });
 
+program
+  .command('doc-sync [path]')
+  .description('Sync documentation with code changes')
+  .option('-a, --auto', 'Automatically update documentation')
+  .option('-u, --update <modules>', 'Update specific modules (comma-separated)')
+  .action(async (targetPath = '.', options?: { auto?: boolean; update?: string }) => {
+    try {
+      const resolvedPath = path.resolve(targetPath);
+      const docSyncCommand = new DocSyncCommand();
+      await docSyncCommand.execute(resolvedPath, options);
+    } catch (error) {
+      console.log(); // Empty line for spacing
+      ora().fail(`Error: ${(error as Error).message}`);
+      process.exit(1);
+    }
+  });
+
 // Change command with subcommands
 const changeCmd = program
   .command('change')
@@ -137,7 +155,7 @@ const changeCmd = program
 
 // Deprecation notice for noun-based commands
 changeCmd.hook('preAction', () => {
-  console.error('Warning: The "openspec change ..." commands are deprecated. Prefer verb-first commands (e.g., "openspec list", "openspec validate --changes").');
+  console.error('Warning: The "cainiaospec change ..." commands are deprecated. Prefer verb-first commands (e.g., "cainiaospec list", "cainiaospec validate --changes").');
 });
 
 changeCmd
@@ -159,12 +177,12 @@ changeCmd
 
 changeCmd
   .command('list')
-  .description('List all active changes (DEPRECATED: use "openspec list" instead)')
+  .description('List all active changes (DEPRECATED: use "cainiaospec list" instead)')
   .option('--json', 'Output as JSON')
   .option('--long', 'Show id and title with counts')
   .action(async (options?: { json?: boolean; long?: boolean }) => {
     try {
-      console.error('Warning: "openspec change list" is deprecated. Use "openspec list".');
+      console.error('Warning: "cainiaospec change list" is deprecated. Use "cainiaospec list".');
       const changeCommand = new ChangeCommand();
       await changeCommand.list(options);
     } catch (error) {

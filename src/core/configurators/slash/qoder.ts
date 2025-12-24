@@ -3,7 +3,7 @@ import { SlashCommandId } from '../../templates/index.js';
 
 /**
  * File paths for Qoder slash commands
- * Maps each OpenSpec workflow stage to its command file location
+ * Maps each CainiaoSpec workflow stage to its command file location
  * Commands are stored in .qoder/commands/cainiaospec/ directory
  */
 const FILE_PATHS: Record<SlashCommandId, string> = {
@@ -24,19 +24,19 @@ const FILE_PATHS: Record<SlashCommandId, string> = {
  */
 const FRONTMATTER: Record<SlashCommandId, string> = {
   proposal: `---
-name: OpenSpec: Proposal
+name: CainiaoSpec: Proposal
 description: Scaffold a new CainiaoSpec change and validate strictly.
 category: CainiaoSpec
 tags: [cainiaospec, change]
 ---`,
   apply: `---
-name: OpenSpec: Apply
+name: CainiaoSpec: Apply
 description: Implement an approved CainiaoSpec change and keep tasks in sync.
 category: CainiaoSpec
 tags: [cainiaospec, apply]
 ---`,
   archive: `---
-name: OpenSpec: Archive
+name: CainiaoSpec: Archive
 description: Archive a deployed CainiaoSpec change and update specs.
 category: CainiaoSpec
 tags: [cainiaospec, archive]
@@ -46,7 +46,7 @@ tags: [cainiaospec, archive]
 /**
  * Qoder Slash Command Configurator
  * 
- * Manages OpenSpec slash commands for Qoder AI assistant.
+ * Manages CainiaoSpec slash commands for Qoder AI assistant.
  * Creates three workflow commands: proposal, apply, and archive.
  * Uses colon-separated command format (/cainiaospec:proposal).
  * 

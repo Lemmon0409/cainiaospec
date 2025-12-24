@@ -22,6 +22,6 @@ export class RooCodeSlashCommandConfigurator extends SlashCommandConfigurator {
       archive: 'Archive a deployed CainiaoSpec change and update specs.'
     };
     const description = descriptions[id];
-    return `# OpenSpec: ${id.charAt(0).toUpperCase() + id.slice(1)}\n\n${description}`;
+    return `# CainiaoSpec: ${id.charAt(0).toUpperCase() + id.slice(1)}\n\n${description}`;
   }
 }

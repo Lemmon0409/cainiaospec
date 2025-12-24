@@ -12,10 +12,16 @@ describe('ChangeCommand.list', () => {
   beforeAll(async () => {
     cmd = new ChangeCommand();
     originalCwd = process.cwd();
-    tempRoot = path.join(os.tmpdir(), `openspec-change-command-list-${Date.now()}`);
-    const changeDir = path.join(tempRoot, 'openspec', 'changes', 'demo');
+    tempRoot = path.join(os.tmpdir(), `cainiaospec-change-command-list-${Date.now()}`);
+    const changeDir = path.join(tempRoot, 'cainiaospec', 'changes', 'demo');
     await fs.mkdir(changeDir, { recursive: true });
-    const proposal = `# Change: Demo\n\n## Why\nTest list.\n\n## What Changes\n- **auth:** Add requirement`;
+    const proposal = `# Change: Demo
+
+## Why
+Test list.
+
+## What Changes
+- **auth:** Add requirement`;
     await fs.writeFile(path.join(changeDir, 'proposal.md'), proposal, 'utf-8');
     await fs.writeFile(path.join(changeDir, 'tasks.md'), '- [x] Task 1\n- [ ] Task 2\n', 'utf-8');
     process.chdir(tempRoot);

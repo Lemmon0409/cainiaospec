@@ -8,7 +8,7 @@ import { select } from '@inquirer/prompts';
 import { isInteractive } from '../utils/interactive.js';
 import { getSpecIds } from '../utils/item-discovery.js';
 
-const SPECS_DIR = 'openspec/specs';
+const SPECS_DIR = 'cainiaospec/specs';
 
 interface ShowOptions {
   json?: boolean;
@@ -66,7 +66,7 @@ function printSpecTextRaw(specPath: string): void {
 }
 
 export class SpecCommand {
-  private SPECS_DIR = 'openspec/specs';
+  private SPECS_DIR = 'cainiaospec/specs';
 
   async show(specId?: string, options: ShowOptions = {}): Promise<void> {
     if (!specId) {
@@ -84,7 +84,7 @@ export class SpecCommand {
 
     const specPath = join(this.SPECS_DIR, specId, 'spec.md');
     if (!existsSync(specPath)) {
-      throw new Error(`Spec '${specId}' not found at openspec/specs/${specId}/spec.md`);
+      throw new Error(`Spec '${specId}' not found at cainiaospec/specs/${specId}/spec.md`);
     }
 
     if (options.json) {
@@ -111,11 +111,11 @@ export class SpecCommand {
 export function registerSpecCommand(rootProgram: typeof program) {
   const specCommand = rootProgram
     .command('spec')
-    .description('Manage and view OpenSpec specifications');
+    .description('Manage and view CainiaoSpec specifications');
 
   // Deprecation notice for noun-based commands
   specCommand.hook('preAction', () => {
-    console.error('Warning: The "openspec spec ..." commands are deprecated. Prefer verb-first commands (e.g., "openspec show", "openspec validate --specs").');
+    console.error('Warning: The "cainiaospec spec ..." commands are deprecated. Prefer verb-first commands (e.g., "cainiaospec show", "cainiaospec validate --specs").');
   });
 
   specCommand
@@ -219,7 +219,7 @@ export function registerSpecCommand(rootProgram: typeof program) {
         const specPath = join(SPECS_DIR, specId, 'spec.md');
         
         if (!existsSync(specPath)) {
-          throw new Error(`Spec '${specId}' not found at openspec/specs/${specId}/spec.md`);
+          throw new Error(`Spec '${specId}' not found at cainiaospec/specs/${specId}/spec.md`);
         }
 
         const validator = new Validator(options.strict);

@@ -14,6 +14,7 @@ import {
 import { CodeScanner } from './code-scanner.js';
 import type { ClassInfo, ApiEndpoint } from './code-scanner.js';
 import { generateModularDocs } from './templates/project-template.js';
+import { DocSyncManager } from './doc-sync.js';
 
 interface SpecUpdate {
   source: string;
@@ -27,9 +28,9 @@ export class ArchiveCommand {
     options: { yes?: boolean; skipSpecs?: boolean; noValidate?: boolean; validate?: boolean } = {}
   ): Promise<void> {
     const targetPath = '.';
-    const changesDir = path.join(targetPath, 'openspec', 'changes');
+    const changesDir = path.join(targetPath, 'cainiaospec', 'changes');
     const archiveDir = path.join(changesDir, 'archive');
-    const mainSpecsDir = path.join(targetPath, 'openspec', 'specs');
+    const mainSpecsDir = path.join(targetPath, 'cainiaospec', 'specs');
 
     // Check if changes directory exists
     try {
@@ -598,7 +599,7 @@ export class ArchiveCommand {
     await fs.writeFile(update.target, rebuilt);
 
     const specName = path.basename(path.dirname(update.target));
-    console.log(`Applying changes to openspec/specs/${specName}/spec.md:`);
+    console.log(`Applying changes to cainiaospec/specs/${specName}/spec.md:`);
     if (counts.added) console.log(`  + ${counts.added} added`);
     if (counts.modified) console.log(`  ~ ${counts.modified} modified`);
     if (counts.removed) console.log(`  - ${counts.removed} removed`);
@@ -1074,9 +1075,9 @@ TBD - created by archiving change ${changeName}. Update Purpose after archive.
       console.log(chalk.gray(`  Extracted ${newClasses.length} class(es) from changes...`));
       
       // 3. Read existing project documentation
-      const openspecDir = path.join('.', 'openspec');
-      const projectMdPath = path.join(openspecDir, 'project.md');
-      const modulesDir = path.join(openspecDir, 'modules');
+      const cainiaospecDir = path.join('.', 'cainiaospec');
+      const projectMdPath = path.join(cainiaospecDir, 'project.md');
+      const modulesDir = path.join(cainiaospecDir, 'modules');
       
       // Check if we have modular docs or single project.md
       let hasModularDocs = false;
@@ -1093,7 +1094,10 @@ TBD - created by archiving change ${changeName}. Update Purpose after archive.
       } else {
         await this.updateSingleProjectDoc(projectMdPath, newClasses, changeName);
       }
-      
+
+      // 5. Auto-update affected documentation files with AI-extracted content
+      await this.autoUpdateAffectedDocumentation(modulesDir, newClasses, changeName);
+
       console.log(chalk.green(`✓ Project documentation updated successfully.`));
       
     } catch (error: any) {
@@ -1180,7 +1184,7 @@ TBD - created by archiving change ${changeName}. Update Purpose after archive.
         
         // Write back
         await fs.writeFile(moduleMdPath, updatedContent);
-        console.log(chalk.gray(`  Updated: openspec/modules/${moduleName}.md`));
+        console.log(chalk.gray(`  Updated: cainiaospec/modules/${moduleName}.md`));
         
       } catch (error: any) {
         console.warn(chalk.yellow(`  Warning: Failed to update module ${moduleName}: ${error.message}`));
@@ -1220,7 +1224,7 @@ TBD - created by archiving change ${changeName}. Update Purpose after archive.
       
       // Write back
       await fs.writeFile(projectMdPath, updatedContent);
-      console.log(chalk.gray(`  Updated: openspec/project.md`));
+      console.log(chalk.gray(`  Updated: cainiaospec/project.md`));
       
     } catch (error: any) {
       throw new Error(`Failed to update project.md: ${error.message}`);
@@ -1522,10 +1526,264 @@ ${changeEntry}
     }
     
     sections.push('');
-    
+
     return sections.join('\n');
   }
-  
+
+  /**
+   * Automatically update affected documentation files with AI-extracted content
+   * This replaces the old reminder-based approach with actual auto-updates
+   */
+  private async autoUpdateAffectedDocumentation(
+    modulesDir: string,
+    newClasses: ClassInfo[],
+    changeName: string
+  ): Promise<void> {
+    try {
+      console.log(chalk.gray(`  Auto-updating affected documentation files...`));
+
+      // Group classes by module
+      const classesByModule = new Map<string, ClassInfo[]>();
+      for (const cls of newClasses) {
+        const moduleName = this.inferModuleName(cls.filePath);
+        if (!classesByModule.has(moduleName)) {
+          classesByModule.set(moduleName, []);
+        }
+        classesByModule.get(moduleName)!.push(cls);
+      }
+
+      const today = this.getArchiveDate();
+      let updatedFiles = 0;
+
+      // Update each affected module's documentation files
+      for (const [moduleName, moduleClasses] of classesByModule.entries()) {
+        // Get the types of classes changed in this module
+        const hasControllers = moduleClasses.some(c => c.type === 'controller');
+        const hasServices = moduleClasses.some(c => c.type === 'service');
+        const hasEntities = moduleClasses.some(c => c.type === 'entity' || c.type === 'dto');
+        const hasRepositories = moduleClasses.some(c => c.type === 'repository');
+
+        // Update specific doc files based on what changed
+        const docUpdates: Array<{ filePath: string; classes: ClassInfo[] }> = [];
+
+        // Controllers documentation
+        if (hasControllers) {
+          const controllersDoc = path.join(modulesDir, moduleName, 'controllers.md');
+          docUpdates.push({
+            filePath: controllersDoc,
+            classes: moduleClasses.filter(c => c.type === 'controller')
+          });
+        }
+
+        // Services documentation
+        if (hasServices) {
+          const servicesDoc = path.join(modulesDir, moduleName, 'services.md');
+          docUpdates.push({
+            filePath: servicesDoc,
+            classes: moduleClasses.filter(c => c.type === 'service')
+          });
+        }
+
+        // Models/Entities documentation
+        if (hasEntities) {
+          const modelsDoc = path.join(modulesDir, moduleName, 'models.md');
+          docUpdates.push({
+            filePath: modelsDoc,
+            classes: moduleClasses.filter(c => c.type === 'entity' || c.type === 'dto')
+          });
+        }
+
+        // Mappers/Repositories documentation
+        if (hasRepositories) {
+          const mappersDoc = path.join(modulesDir, moduleName, 'mappers.md');
+          docUpdates.push({
+            filePath: mappersDoc,
+            classes: moduleClasses.filter(c => c.type === 'repository')
+          });
+        }
+
+        // Apply updates to each documentation file
+        for (const update of docUpdates) {
+          try {
+            await this.updateDocFileWithExtractedCode(
+              update.filePath,
+              update.classes,
+              moduleName,
+              changeName,
+              today
+            );
+            updatedFiles++;
+          } catch (error: any) {
+            console.warn(chalk.yellow(`  Warning: Failed to update ${update.filePath}: ${error.message}`));
+          }
+        }
+      }
+
+      if (updatedFiles > 0) {
+        console.log(chalk.gray(`  Auto-updated ${updatedFiles} documentation file(s).`));
+      }
+
+      // Update the code snapshot for future change detection
+      const cainiaospecDir = path.join('.', 'cainiaospec');
+      const docSyncManager = new DocSyncManager({
+        projectPath: '.',
+        docPath: cainiaospecDir,
+        ignorePatterns: [
+          '**/node_modules/**',
+          '**/dist/**',
+          '**/build/**',
+          '**/*.test.*',
+          '**/*.spec.*',
+          '**/cainiaospec/**',
+        ],
+      });
+
+      // Save current snapshot to track these changes for next time
+      await docSyncManager['scanCurrentCode']().then(async (snapshot) => {
+        await docSyncManager['saveSnapshot'](snapshot);
+      });
+
+    } catch (error: any) {
+      console.warn(chalk.yellow(`  Warning: Auto-update encountered issues: ${error.message}`));
+      console.log(chalk.gray('  This is not critical. Documentation can be manually updated.'));
+    }
+  }
+
+  /**
+   * Update a specific documentation file with extracted code content
+   */
+  private async updateDocFileWithExtractedCode(
+    docFilePath: string,
+    classes: ClassInfo[],
+    moduleName: string,
+    changeName: string,
+    date: string
+  ): Promise<void> {
+    // Ensure the directory exists
+    await fs.mkdir(path.dirname(docFilePath), { recursive: true });
+
+    // Read existing content or create new header
+    let existingContent = '';
+    try {
+      existingContent = await fs.readFile(docFilePath, 'utf-8');
+    } catch {
+      // File doesn't exist, create basic header
+      const docType = path.basename(docFilePath, '.md');
+      existingContent = this.generateDocHeader(docType, moduleName);
+    }
+
+    // Build the update for each class
+    const updatedSections: string[] = [];
+
+    for (const cls of classes) {
+      const classSection = this.generateExtractedClassSection(cls);
+      updatedSections.push(classSection);
+    }
+
+    // Merge new content with existing
+    let updatedContent = existingContent;
+
+    // Add or update the "Generated from code" marker
+    const marker = `
+
+<!-- AUTO_GENERATED: Updated from change "${changeName}" on ${date} -->
+<!-- These sections are auto-extracted from source code -->
+`;
+
+    // Check if we should append or replace
+    const autoGenMarker = '<!-- AUTO_GENERATED:';
+    if (updatedContent.includes(autoGenMarker)) {
+      // Replace existing auto-generated section
+      const startMarker = updatedContent.indexOf(autoGenMarker);
+      const endMarker = updatedContent.indexOf('-->', startMarker);
+      if (endMarker !== -1) {
+        // Keep content before the marker, add new marker and sections
+        const beforeMarker = updatedContent.substring(0, startMarker).trimEnd();
+        updatedContent = beforeMarker + marker + '\n' + updatedSections.join('\n') + '\n' + updatedContent.substring(endMarker + 3);
+      }
+    } else {
+      // Append to existing content
+      updatedContent = updatedContent.trimEnd() + marker + '\n' + updatedSections.join('\n') + '\n';
+    }
+
+    await fs.writeFile(docFilePath, updatedContent);
+  }
+
+  /**
+   * Generate documentation header for new file
+   */
+  private generateDocHeader(docType: string, moduleName: string): string {
+    const titles: Record<string, string> = {
+      controllers: 'Controllers',
+      services: 'Services',
+      models: 'Data Models',
+      mappers: 'Mappers & Repositories',
+    };
+
+    const title = titles[docType] || docType.charAt(0).toUpperCase() + docType.slice(1);
+
+    return `# ${moduleName} - ${title}
+
+> Auto-generated documentation from code analysis
+
+---
+
+`;
+  }
+
+  /**
+   * Generate class documentation section with extracted code
+   */
+  private generateExtractedClassSection(cls: ClassInfo): string {
+    const lines: string[] = [];
+
+    lines.push(`## ${cls.name}`);
+    lines.push('');
+    lines.push(`**Type**: \`${cls.type}\``);
+    lines.push(`**File**: \`${cls.filePath}\``);
+    lines.push('');
+
+    // Add methods
+    if (cls.methods && cls.methods.length > 0) {
+      lines.push(`### Methods`);
+      lines.push('');
+
+      for (const method of cls.methods) {
+        const params = method.parameters.map(p => `${p.name}: ${p.type}`).join(', ');
+        lines.push(`#### \`${method.name}(${params})\``);
+        lines.push('');
+
+        if (method.returnType) {
+          lines.push(`**Returns**: \`${method.returnType}\``);
+          lines.push('');
+        }
+
+        // Add call chain placeholder for AI to fill
+        lines.push(`\`\`\`typescript`);
+        lines.push(`// ${method.businessLogic || 'AI_FILL_HERE: Extract method implementation from source code'}`);
+        lines.push(`\`\`\``);
+        lines.push('');
+      }
+    }
+
+    // Add fields
+    if (cls.fields && cls.fields.length > 0) {
+      lines.push(`### Fields`);
+      lines.push('');
+      lines.push(`| Field | Type | Description |`);
+      lines.push(`|-------|------|-------------|`);
+      for (const field of cls.fields) {
+        lines.push(`| \`${field.name}\` | \`${field.type}\` | ${field.description || '-'} |`);
+      }
+      lines.push('');
+    }
+
+    lines.push('---');
+    lines.push('');
+
+    return lines.join('\n');
+  }
+
 }
 
 // Type definitions for archive analysis

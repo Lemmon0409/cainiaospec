@@ -105,7 +105,7 @@ $ARGUMENTS`,
     const startIndex = content.indexOf(OPENSPEC_MARKERS.start);
 
     if (startIndex === -1) {
-      throw new Error(`Missing OpenSpec start marker in ${filePath}`);
+      throw new Error(`Missing CainiaoSpec start marker in ${filePath}`);
     }
 
     // Replace everything before the start marker with the new frontmatter

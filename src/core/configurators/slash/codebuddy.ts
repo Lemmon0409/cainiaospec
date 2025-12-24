@@ -9,19 +9,19 @@ const FILE_PATHS: Record<SlashCommandId, string> = {
 
 const FRONTMATTER: Record<SlashCommandId, string> = {
   proposal: `---
-name: OpenSpec: Proposal
+name: CainiaoSpec: Proposal
 description: Scaffold a new CainiaoSpec change and validate strictly.
 category: CainiaoSpec
 tags: [cainiaospec, change]
 ---`,
   apply: `---
-name: OpenSpec: Apply
+name: CainiaoSpec: Apply
 description: Implement an approved CainiaoSpec change and keep tasks in sync.
 category: CainiaoSpec
 tags: [cainiaospec, apply]
 ---`,
   archive: `---
-name: OpenSpec: Archive
+name: CainiaoSpec: Archive
 description: Archive a deployed CainiaoSpec change and update specs.
 category: CainiaoSpec
 tags: [cainiaospec, archive]

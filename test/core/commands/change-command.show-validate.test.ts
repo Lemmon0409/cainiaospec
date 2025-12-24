@@ -13,10 +13,16 @@ describe('ChangeCommand.show/validate', () => {
   beforeAll(async () => {
     cmd = new ChangeCommand();
     originalCwd = process.cwd();
-    tempRoot = path.join(os.tmpdir(), `openspec-change-command-${Date.now()}`);
-    const changesDir = path.join(tempRoot, 'openspec', 'changes', 'sample-change');
+    tempRoot = path.join(os.tmpdir(), `cainiaospec-change-command-${Date.now()}`);
+    const changesDir = path.join(tempRoot, 'cainiaospec', 'changes', 'sample-change');
     await fs.mkdir(changesDir, { recursive: true });
-    const proposal = `# Change: Sample Change\n\n## Why\nConsistency in tests.\n\n## What Changes\n- **auth:** Add requirement`;
+    const proposal = `# Change: Sample Change
+
+## Why
+Consistency in tests.
+
+## What Changes
+- **auth:** Add requirement`;
     await fs.writeFile(path.join(changesDir, 'proposal.md'), proposal, 'utf-8');
     process.chdir(tempRoot);
     changeName = 'sample-change';

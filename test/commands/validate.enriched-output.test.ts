@@ -6,8 +6,8 @@ import { execSync } from 'child_process';
 describe('validate command enriched human output', () => {
   const projectRoot = process.cwd();
   const testDir = path.join(projectRoot, 'test-validate-enriched-tmp');
-  const changesDir = path.join(testDir, 'openspec', 'changes');
-  const bin = path.join(projectRoot, 'bin', 'openspec.js');
+  const changesDir = path.join(testDir, 'cainiaospec', 'changes');
+  const bin = path.join(projectRoot, 'bin', 'cainiaospec.js');
 
 
   beforeEach(async () => {
@@ -19,7 +19,13 @@ describe('validate command enriched human output', () => {
   });
 
   it('prints Next steps footer and guidance on invalid change', () => {
-    const changeContent = `# Test Change\n\n## Why\nThis is a sufficiently long explanation to pass the why length requirement for validation purposes.\n\n## What Changes\nThere are changes proposed, but no delta specs provided yet.`;
+    const changeContent = `# Test Change
+
+## Why
+This is a sufficiently long explanation to pass the why length requirement for validation purposes.
+
+## What Changes
+There are changes proposed, but no delta specs provided yet.`;
     const changeId = 'c-next-steps';
     const changePath = path.join(changesDir, changeId);
     execSync(`mkdir -p ${changePath}`);
@@ -39,7 +45,7 @@ describe('validate command enriched human output', () => {
       expect(code).not.toBe(0);
       expect(stderr).toContain('has issues');
       expect(stderr).toContain('Next steps:');
-      expect(stderr).toContain('openspec change show');
+      expect(stderr).toContain('cainiaospec change show');
     } finally {
       process.chdir(originalCwd);
     }

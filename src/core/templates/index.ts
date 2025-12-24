@@ -14,9 +14,11 @@ export interface Template {
 export class TemplateManager {
   static getTemplates(context: ProjectContext = {}): Template[] {
     // Check if we should generate modular docs
-    const shouldSplitDocs = context.projectStructure && 
-                           context.projectStructure.modules.length > 0 &&
-                           (context.allClasses || []).length > 50; // Split if more than 50 classes
+    // 有多模块结构时生成模块化文档，或者类超过 30 个
+    const hasMultipleModules = context.projectStructure && 
+                               context.projectStructure.modules.length > 0;
+    const hasEnoughClasses = (context.allClasses || []).length > 0;
+    const shouldSplitDocs = hasMultipleModules && hasEnoughClasses;
     
     if (shouldSplitDocs) {
       // Generate modular documentation (split into multiple files)

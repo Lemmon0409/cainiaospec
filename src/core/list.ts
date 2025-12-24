@@ -14,7 +14,7 @@ interface ChangeInfo {
 export class ListCommand {
   async execute(targetPath: string = '.', mode: 'changes' | 'specs' = 'changes'): Promise<void> {
     if (mode === 'changes') {
-      const changesDir = path.join(targetPath, 'openspec', 'changes');
+      const changesDir = path.join(targetPath, 'cainiaospec', 'changes');
       
       // Check if changes directory exists
       try {
@@ -62,7 +62,7 @@ export class ListCommand {
     }
 
     // specs mode
-    const specsDir = path.join(targetPath, 'openspec', 'specs');
+    const specsDir = path.join(targetPath, 'cainiaospec', 'specs');
     try {
       await fs.access(specsDir);
     } catch {

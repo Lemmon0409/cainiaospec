@@ -6,13 +6,19 @@ import { execSync } from 'child_process';
 describe('spec show (interactive behavior)', () => {
   const projectRoot = process.cwd();
   const testDir = path.join(projectRoot, 'test-spec-show-tmp');
-  const specsDir = path.join(testDir, 'openspec', 'specs');
-  const bin = path.join(projectRoot, 'bin', 'openspec.js');
+  const specsDir = path.join(testDir, 'cainiaospec', 'specs');
+  const bin = path.join(projectRoot, 'bin', 'cainiaospec.js');
 
 
   beforeEach(async () => {
     await fs.mkdir(specsDir, { recursive: true });
-    const content = `## Purpose\nX\n\n## Requirements\n\n### Requirement: R\nText`;
+    const content = `## Purpose
+X
+
+## Requirements
+
+### Requirement: R
+Text`;
     await fs.mkdir(path.join(specsDir, 's1'), { recursive: true });
     await fs.writeFile(path.join(specsDir, 's1', 'spec.md'), content, 'utf-8');
   });

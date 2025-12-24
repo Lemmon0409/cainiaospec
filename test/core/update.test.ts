@@ -14,12 +14,12 @@ describe('UpdateCommand', () => {
 
   beforeEach(async () => {
     // Create a temporary test directory
-    testDir = path.join(os.tmpdir(), `openspec-test-${randomUUID()}`);
+    testDir = path.join(os.tmpdir(), `cainiaospec-test-${randomUUID()}`);
     await fs.mkdir(testDir, { recursive: true });
 
-    // Create openspec directory
-    const openspecDir = path.join(testDir, 'openspec');
-    await fs.mkdir(openspecDir, { recursive: true });
+    // Create cainiaospec directory
+    const cainiaospecDir = path.join(testDir, 'cainiaospec');
+    await fs.mkdir(cainiaospecDir, { recursive: true });
 
     updateCommand = new UpdateCommand();
 
@@ -42,9 +42,9 @@ describe('UpdateCommand', () => {
 
 Some existing content here.
 
-<!-- OPENSPEC:START -->
+<!-- CAINIAOSPEC:START -->
 Old OpenSpec content
-<!-- OPENSPEC:END -->
+<!-- CAINIAOSPEC:END -->
 
 More content after.`;
     await fs.writeFile(claudePath, initialContent);
@@ -56,17 +56,17 @@ More content after.`;
 
     // Check that CLAUDE.md was updated
     const updatedContent = await fs.readFile(claudePath, 'utf-8');
-    expect(updatedContent).toContain('<!-- OPENSPEC:START -->');
-    expect(updatedContent).toContain('<!-- OPENSPEC:END -->');
-    expect(updatedContent).toContain("@/openspec/AGENTS.md");
-    expect(updatedContent).toContain('openspec update');
+    expect(updatedContent).toContain('<!-- CAINIAOSPEC:START -->');
+    expect(updatedContent).toContain('<!-- CAINIAOSPEC:END -->');
+    expect(updatedContent).toContain("@/cainiaospec/AGENTS.md");
+    expect(updatedContent).toContain('cainiaospec update');
     expect(updatedContent).toContain('Some existing content here');
     expect(updatedContent).toContain('More content after');
 
     // Check console output
     const [logMessage] = consoleSpy.mock.calls[0];
     expect(logMessage).toContain(
-      'Updated OpenSpec instructions (openspec/AGENTS.md'
+      'Updated CainiaoSpec instructions (cainiaospec/AGENTS.md'
     );
     expect(logMessage).toContain('AGENTS.md (created)');
     expect(logMessage).toContain('Updated AI tool files: CLAUDE.md');
@@ -79,9 +79,9 @@ More content after.`;
 
 Some existing content.
 
-<!-- OPENSPEC:START -->
+<!-- CAINIAOSPEC:START -->
 Old OpenSpec content
-<!-- OPENSPEC:END -->
+<!-- CAINIAOSPEC:END -->
 
 More notes here.`;
     await fs.writeFile(qwenPath, initialContent);
@@ -91,16 +91,16 @@ More notes here.`;
     await updateCommand.execute(testDir);
 
     const updatedContent = await fs.readFile(qwenPath, 'utf-8');
-    expect(updatedContent).toContain('<!-- OPENSPEC:START -->');
-    expect(updatedContent).toContain('<!-- OPENSPEC:END -->');
-    expect(updatedContent).toContain("@/openspec/AGENTS.md");
-    expect(updatedContent).toContain('openspec update');
+    expect(updatedContent).toContain('<!-- CAINIAOSPEC:START -->');
+    expect(updatedContent).toContain('<!-- CAINIAOSPEC:END -->');
+    expect(updatedContent).toContain("@/cainiaospec/AGENTS.md");
+    expect(updatedContent).toContain('cainiaospec update');
     expect(updatedContent).toContain('Some existing content.');
     expect(updatedContent).toContain('More notes here.');
 
     const [logMessage] = consoleSpy.mock.calls[0];
     expect(logMessage).toContain(
-      'Updated OpenSpec instructions (openspec/AGENTS.md'
+      'Updated CainiaoSpec instructions (cainiaospec/AGENTS.md'
     );
     expect(logMessage).toContain('AGENTS.md (created)');
     expect(logMessage).toContain('Updated AI tool files: QWEN.md');
@@ -115,14 +115,14 @@ More notes here.`;
     );
     await fs.mkdir(path.dirname(proposalPath), { recursive: true });
     const initialContent = `---
-name: OpenSpec: Proposal
+name: CainiaoSpec: Proposal
 description: Old description
 category: OpenSpec
 tags: [openspec, change]
 ---
-<!-- OPENSPEC:START -->
+<!-- CAINIAOSPEC:START -->
 Old slash content
-<!-- OPENSPEC:END -->`;
+<!-- CAINIAOSPEC:END -->`;
     await fs.writeFile(proposalPath, initialContent);
 
     const consoleSpy = vi.spyOn(console, 'log');
@@ -130,7 +130,7 @@ Old slash content
     await updateCommand.execute(testDir);
 
     const updated = await fs.readFile(proposalPath, 'utf-8');
-    expect(updated).toContain('name: OpenSpec: Proposal');
+    expect(updated).toContain('name: CainiaoSpec: Proposal');
     expect(updated).toContain('**Guardrails**');
     expect(updated).toContain(
       'Validate with `openspec validate <id> --strict`'
@@ -139,7 +139,7 @@ Old slash content
 
     const [logMessage] = consoleSpy.mock.calls[0];
     expect(logMessage).toContain(
-      'Updated OpenSpec instructions (openspec/AGENTS.md'
+      'Updated CainiaoSpec instructions (cainiaospec/AGENTS.md'
     );
     expect(logMessage).toContain('AGENTS.md (created)');
     expect(logMessage).toContain(
@@ -158,9 +158,9 @@ Old slash content
     const initialContent = `description = "Implement an approved OpenSpec change and keep tasks in sync."
 
 prompt = """
-<!-- OPENSPEC:START -->
+<!-- CAINIAOSPEC:START -->
 Old body
-<!-- OPENSPEC:END -->
+<!-- CAINIAOSPEC:END -->
 """
 `;
     await fs.writeFile(applyPath, initialContent);
@@ -172,13 +172,13 @@ Old body
     const updated = await fs.readFile(applyPath, 'utf-8');
     expect(updated).toContain('description = "Implement an approved OpenSpec change and keep tasks in sync."');
     expect(updated).toContain('prompt = """');
-    expect(updated).toContain('<!-- OPENSPEC:START -->');
+    expect(updated).toContain('<!-- CAINIAOSPEC:START -->');
     expect(updated).toContain('Work through tasks sequentially');
     expect(updated).not.toContain('Old body');
 
     const [logMessage] = consoleSpy.mock.calls[0];
     expect(logMessage).toContain(
-      'Updated OpenSpec instructions (openspec/AGENTS.md'
+      'Updated CainiaoSpec instructions (cainiaospec/AGENTS.md'
     );
     expect(logMessage).toContain('AGENTS.md (created)');
     expect(logMessage).toContain(
@@ -200,9 +200,9 @@ Old body
       `description = "Old description"
 
 prompt = """
-<!-- OPENSPEC:START -->
+<!-- CAINIAOSPEC:START -->
 Old content
-<!-- OPENSPEC:END -->
+<!-- CAINIAOSPEC:END -->
 """
 `
     );
@@ -251,9 +251,9 @@ Old content
 
 Some existing Cline rules here.
 
-<!-- OPENSPEC:START -->
+<!-- CAINIAOSPEC:START -->
 Old OpenSpec content
-<!-- OPENSPEC:END -->
+<!-- CAINIAOSPEC:END -->
 
 More rules after.`;
     await fs.writeFile(clinePath, initialContent);
@@ -265,17 +265,17 @@ More rules after.`;
 
     // Check that CLINE.md was updated
     const updatedContent = await fs.readFile(clinePath, 'utf-8');
-    expect(updatedContent).toContain('<!-- OPENSPEC:START -->');
-    expect(updatedContent).toContain('<!-- OPENSPEC:END -->');
-    expect(updatedContent).toContain("@/openspec/AGENTS.md");
-    expect(updatedContent).toContain('openspec update');
+    expect(updatedContent).toContain('<!-- CAINIAOSPEC:START -->');
+    expect(updatedContent).toContain('<!-- CAINIAOSPEC:END -->');
+    expect(updatedContent).toContain("@/cainiaospec/AGENTS.md");
+    expect(updatedContent).toContain('cainiaospec update');
     expect(updatedContent).toContain('Some existing Cline rules here');
     expect(updatedContent).toContain('More rules after');
 
     // Check console output
     const [logMessage] = consoleSpy.mock.calls[0];
     expect(logMessage).toContain(
-      'Updated OpenSpec instructions (openspec/AGENTS.md'
+      'Updated CainiaoSpec instructions (cainiaospec/AGENTS.md'
     );
     expect(logMessage).toContain('AGENTS.md (created)');
     expect(logMessage).toContain('Updated AI tool files: CLINE.md');
@@ -300,13 +300,13 @@ More rules after.`;
       '.clinerules/workflows/openspec-proposal.md'
     );
     await fs.mkdir(path.dirname(proposalPath), { recursive: true });
-    const initialContent = `# OpenSpec: Proposal
+    const initialContent = `# CainiaoSpec: Proposal
 
 Scaffold a new OpenSpec change and validate strictly.
 
-<!-- OPENSPEC:START -->
+<!-- CAINIAOSPEC:START -->
 Old slash content
-<!-- OPENSPEC:END -->`;
+<!-- CAINIAOSPEC:END -->`;
     await fs.writeFile(proposalPath, initialContent);
 
     const consoleSpy = vi.spyOn(console, 'log');
@@ -314,7 +314,7 @@ Old slash content
     await updateCommand.execute(testDir);
 
     const updated = await fs.readFile(proposalPath, 'utf-8');
-    expect(updated).toContain('# OpenSpec: Proposal');
+    expect(updated).toContain('# CainiaoSpec: Proposal');
     expect(updated).toContain('**Guardrails**');
     expect(updated).toContain(
       'Validate with `openspec validate <id> --strict`'
@@ -323,7 +323,7 @@ Old slash content
 
     const [logMessage] = consoleSpy.mock.calls[0];
     expect(logMessage).toContain(
-      'Updated OpenSpec instructions (openspec/AGENTS.md'
+      'Updated CainiaoSpec instructions (cainiaospec/AGENTS.md'
     );
     expect(logMessage).toContain('AGENTS.md (created)');
     expect(logMessage).toContain(
@@ -337,14 +337,14 @@ Old slash content
     const cursorPath = path.join(testDir, '.cursor/commands/openspec-apply.md');
     await fs.mkdir(path.dirname(cursorPath), { recursive: true });
     const initialContent = `---
-name: /openspec-apply
-id: openspec-apply
+name: /cainiaospec-apply
+id: cainiaospec-apply
 category: OpenSpec
 description: Old description
 ---
-<!-- OPENSPEC:START -->
+<!-- CAINIAOSPEC:START -->
 Old body
-<!-- OPENSPEC:END -->`;
+<!-- CAINIAOSPEC:END -->`;
     await fs.writeFile(cursorPath, initialContent);
 
     const consoleSpy = vi.spyOn(console, 'log');
@@ -352,13 +352,13 @@ Old body
     await updateCommand.execute(testDir);
 
     const updated = await fs.readFile(cursorPath, 'utf-8');
-    expect(updated).toContain('id: openspec-apply');
+    expect(updated).toContain('id: cainiaospec-apply');
     expect(updated).toContain('Work through tasks sequentially');
     expect(updated).not.toContain('Old body');
 
     const [logMessage] = consoleSpy.mock.calls[0];
     expect(logMessage).toContain(
-      'Updated OpenSpec instructions (openspec/AGENTS.md'
+      'Updated CainiaoSpec instructions (cainiaospec/AGENTS.md'
     );
     expect(logMessage).toContain('AGENTS.md (created)');
     expect(logMessage).toContain(
@@ -375,14 +375,14 @@ Old body
     );
     await fs.mkdir(path.dirname(openCodePath), { recursive: true });
     const initialContent = `---
-name: /openspec-apply
-id: openspec-apply
+name: /cainiaospec-apply
+id: cainiaospec-apply
 category: OpenSpec
 description: Old description
 ---
-<!-- OPENSPEC:START -->
+<!-- CAINIAOSPEC:START -->
 Old body
-<!-- OPENSPEC:END -->`;
+<!-- CAINIAOSPEC:END -->`;
     await fs.writeFile(openCodePath, initialContent);
 
     const consoleSpy = vi.spyOn(console, 'log');
@@ -390,13 +390,13 @@ Old body
     await updateCommand.execute(testDir);
 
     const updated = await fs.readFile(openCodePath, 'utf-8');
-    expect(updated).toContain('id: openspec-apply');
+    expect(updated).toContain('id: cainiaospec-apply');
     expect(updated).toContain('Work through tasks sequentially');
     expect(updated).not.toContain('Old body');
 
     const [logMessage] = consoleSpy.mock.calls[0];
     expect(logMessage).toContain(
-      'Updated OpenSpec instructions (openspec/AGENTS.md'
+      'Updated CainiaoSpec instructions (cainiaospec/AGENTS.md'
     );
     expect(logMessage).toContain('AGENTS.md (created)');
     expect(logMessage).toContain(
@@ -412,9 +412,9 @@ Old body
       '.kilocode/workflows/openspec-apply.md'
     );
     await fs.mkdir(path.dirname(kilocodePath), { recursive: true });
-    const initialContent = `<!-- OPENSPEC:START -->
+    const initialContent = `<!-- CAINIAOSPEC:START -->
 Old body
-<!-- OPENSPEC:END -->`;
+<!-- CAINIAOSPEC:END -->`;
     await fs.writeFile(kilocodePath, initialContent);
 
     const consoleSpy = vi.spyOn(console, 'log');
@@ -424,7 +424,7 @@ Old body
     const updated = await fs.readFile(kilocodePath, 'utf-8');
     expect(updated).toContain('Work through tasks sequentially');
     expect(updated).not.toContain('Old body');
-    expect(updated.startsWith('<!-- OPENSPEC:START -->')).toBe(true);
+    expect(updated.startsWith('<!-- CAINIAOSPEC:START -->')).toBe(true);
 
     const [logMessage] = consoleSpy.mock.calls[0];
     expect(logMessage).toContain(
@@ -440,11 +440,11 @@ Old body
       '.windsurf/workflows/openspec-apply.md'
     );
     await fs.mkdir(path.dirname(wsPath), { recursive: true });
-    const initialContent = `## OpenSpec: Apply (Windsurf)
+    const initialContent = `## CainiaoSpec: Apply (Windsurf)
 Intro
-<!-- OPENSPEC:START -->
+<!-- CAINIAOSPEC:START -->
 Old body
-<!-- OPENSPEC:END -->`;
+<!-- CAINIAOSPEC:END -->`;
     await fs.writeFile(wsPath, initialContent);
 
     const consoleSpy = vi.spyOn(console, 'log');
@@ -454,7 +454,7 @@ Old body
     const updated = await fs.readFile(wsPath, 'utf-8');
     expect(updated).toContain('Work through tasks sequentially');
     expect(updated).not.toContain('Old body');
-    expect(updated).toContain('## OpenSpec: Apply (Windsurf)');
+    expect(updated).toContain('## CainiaoSpec: Apply (Windsurf)');
 
     const [logMessage] = consoleSpy.mock.calls[0];
     expect(logMessage).toContain(
@@ -473,9 +473,9 @@ Old body
 description: Implement an approved OpenSpec change and keep tasks in sync.
 ---
 
-<!-- OPENSPEC:START -->
+<!-- CAINIAOSPEC:START -->
 Old body
-<!-- OPENSPEC:END -->`;
+<!-- CAINIAOSPEC:END -->`;
     await fs.writeFile(agPath, initialContent);
 
     const consoleSpy = vi.spyOn(console, 'log');
@@ -501,7 +501,15 @@ Old body
       '.codex/prompts/openspec-apply.md'
     );
     await fs.mkdir(path.dirname(codexPath), { recursive: true });
-    const initialContent = `---\ndescription: Old description\nargument-hint: old-hint\n---\n\n$ARGUMENTS\n<!-- OPENSPEC:START -->\nOld body\n<!-- OPENSPEC:END -->`;
+    const initialContent = `---
+description: Old description
+argument-hint: old-hint
+---
+
+$ARGUMENTS
+<!-- CAINIAOSPEC:START -->
+Old body
+<!-- CAINIAOSPEC:END -->`;
     await fs.writeFile(codexPath, initialContent);
 
     const consoleSpy = vi.spyOn(console, 'log');
@@ -534,7 +542,7 @@ Old body
     await fs.mkdir(path.dirname(codexApply), { recursive: true });
     await fs.writeFile(
       codexApply,
-      '---\ndescription: Old\nargument-hint: old\n---\n\n$ARGUMENTS\n<!-- OPENSPEC:START -->\nOld\n<!-- OPENSPEC:END -->'
+      '---\ndescription: Old\nargument-hint: old\n---\n\n$ARGUMENTS\n<!-- CAINIAOSPEC:START -->\nOld\n<!-- CAINIAOSPEC:END -->'
     );
 
     await updateCommand.execute(testDir);
@@ -564,9 +572,9 @@ description: Implement an approved OpenSpec change and keep tasks in sync.
 ---
 
 $ARGUMENTS
-<!-- OPENSPEC:START -->
+<!-- CAINIAOSPEC:START -->
 Old body
-<!-- OPENSPEC:END -->`;
+<!-- CAINIAOSPEC:END -->`;
     await fs.writeFile(ghPath, initialContent);
 
     const consoleSpy = vi.spyOn(console, 'log');
@@ -597,7 +605,7 @@ Old body
     await fs.mkdir(path.dirname(ghApply), { recursive: true });
     await fs.writeFile(
       ghApply,
-      '---\ndescription: Old\n---\n\n$ARGUMENTS\n<!-- OPENSPEC:START -->\nOld\n<!-- OPENSPEC:END -->'
+      '---\ndescription: Old\n---\n\n$ARGUMENTS\n<!-- CAINIAOSPEC:START -->\nOld\n<!-- CAINIAOSPEC:END -->'
     );
 
     await updateCommand.execute(testDir);
@@ -625,9 +633,9 @@ Old body
     const initialContent = `description = "Scaffold a new OpenSpec change and validate strictly."
 
 prompt = """
-<!-- OPENSPEC:START -->
+<!-- CAINIAOSPEC:START -->
 Old Gemini body
-<!-- OPENSPEC:END -->
+<!-- CAINIAOSPEC:END -->
 """
 `;
     await fs.writeFile(geminiProposal, initialContent);
@@ -639,9 +647,9 @@ Old Gemini body
     const updated = await fs.readFile(geminiProposal, 'utf-8');
     expect(updated).toContain('description = "Scaffold a new OpenSpec change and validate strictly."');
     expect(updated).toContain('prompt = """');
-    expect(updated).toContain('<!-- OPENSPEC:START -->');
+    expect(updated).toContain('<!-- CAINIAOSPEC:START -->');
     expect(updated).toContain('**Guardrails**');
-    expect(updated).toContain('<!-- OPENSPEC:END -->');
+    expect(updated).toContain('<!-- CAINIAOSPEC:END -->');
     expect(updated).not.toContain('Old Gemini body');
 
     const geminiApply = path.join(
@@ -673,9 +681,9 @@ Old Gemini body
     const initialContent = `description: Scaffold a new OpenSpec change and validate strictly."
 
 prompt = """
-<!-- OPENSPEC:START -->
+<!-- CAINIAOSPEC:START -->
 Old IFlow body
-<!-- OPENSPEC:END -->
+<!-- CAINIAOSPEC:END -->
 """
 `;
     await fs.writeFile(iflowProposal, initialContent);
@@ -686,9 +694,9 @@ Old IFlow body
 
     const updated = await fs.readFile(iflowProposal, 'utf-8');
     expect(updated).toContain('description: Scaffold a new OpenSpec change and validate strictly.');
-    expect(updated).toContain('<!-- OPENSPEC:START -->');
+    expect(updated).toContain('<!-- CAINIAOSPEC:START -->');
     expect(updated).toContain('**Guardrails**');
-    expect(updated).toContain('<!-- OPENSPEC:END -->');
+    expect(updated).toContain('<!-- CAINIAOSPEC:END -->');
     expect(updated).not.toContain('Old IFlow body');
 
     const iflowApply = path.join(
@@ -722,9 +730,9 @@ description: Scaffold a new OpenSpec change and validate strictly.
 argument-hint: request or feature description
 ---
 
-<!-- OPENSPEC:START -->
+<!-- CAINIAOSPEC:START -->
 Old body
-<!-- OPENSPEC:END -->`;
+<!-- CAINIAOSPEC:END -->`;
     await fs.writeFile(factoryPath, initialContent);
 
     const consoleSpy = vi.spyOn(console, 'log');
@@ -735,7 +743,7 @@ Old body
     expect(updated).toContain('description: Scaffold a new OpenSpec change and validate strictly.');
     expect(updated).toContain('argument-hint: request or feature description');
     expect(
-      /<!-- OPENSPEC:START -->([\s\S]*?)<!-- OPENSPEC:END -->/u.exec(updated)?.[1]
+      /<!-- CAINIAOSPEC:START -->([\s\S]*?)<!-- CAINIAOSPEC:END -->/u.exec(updated)?.[1]
     ).toContain('$ARGUMENTS');
     expect(updated).toContain('**Guardrails**');
     expect(updated).not.toContain('Old body');
@@ -761,9 +769,9 @@ description: Old
 argument-hint: old
 ---
 
-<!-- OPENSPEC:START -->
+<!-- CAINIAOSPEC:START -->
 Old body
-<!-- OPENSPEC:END -->`
+<!-- CAINIAOSPEC:END -->`
     );
 
     await updateCommand.execute(testDir);
@@ -796,9 +804,9 @@ The user wants to apply the following change. Use the openspec instructions to i
 <ChangeId>
   $ARGUMENTS
 </ChangeId>
-<!-- OPENSPEC:START -->
+<!-- CAINIAOSPEC:START -->
 Old body
-<!-- OPENSPEC:END -->`;
+<!-- CAINIAOSPEC:END -->`;
     await fs.writeFile(aqPath, initialContent);
 
     const consoleSpy = vi.spyOn(console, 'log');
@@ -807,8 +815,8 @@ Old body
 
     const updatedContent = await fs.readFile(aqPath, 'utf-8');
     expect(updatedContent).toContain('**Guardrails**');
-    expect(updatedContent).toContain('<!-- OPENSPEC:START -->');
-    expect(updatedContent).toContain('<!-- OPENSPEC:END -->');
+    expect(updatedContent).toContain('<!-- CAINIAOSPEC:START -->');
+    expect(updatedContent).toContain('<!-- CAINIAOSPEC:END -->');
     expect(updatedContent).not.toContain('Old body');
 
     expect(consoleSpy).toHaveBeenCalledWith(
@@ -828,7 +836,7 @@ Old body
     await fs.mkdir(path.dirname(aqApply), { recursive: true });
     await fs.writeFile(
       aqApply,
-      '---\ndescription: Old\n---\n\nThe user wants to apply the following change.\n\n<ChangeId>\n  $ARGUMENTS\n</ChangeId>\n<!-- OPENSPEC:START -->\nOld\n<!-- OPENSPEC:END -->'
+      '---\ndescription: Old\n---\n\nThe user wants to apply the following change.\n\n<ChangeId>\n  $ARGUMENTS\n</ChangeId>\n<!-- CAINIAOSPEC:START -->\nOld\n<!-- CAINIAOSPEC:END -->'
     );
 
     await updateCommand.execute(testDir);
@@ -857,9 +865,9 @@ Old body
 description: Implement an approved OpenSpec change and keep tasks in sync.
 argument-hint: change-id
 ---
-<!-- OPENSPEC:START -->
+<!-- CAINIAOSPEC:START -->
 Old body
-<!-- OPENSPEC:END -->`;
+<!-- CAINIAOSPEC:END -->`;
     await fs.writeFile(auggiePath, initialContent);
 
     const consoleSpy = vi.spyOn(console, 'log');
@@ -868,8 +876,8 @@ Old body
 
     const updatedContent = await fs.readFile(auggiePath, 'utf-8');
     expect(updatedContent).toContain('**Guardrails**');
-    expect(updatedContent).toContain('<!-- OPENSPEC:START -->');
-    expect(updatedContent).toContain('<!-- OPENSPEC:END -->');
+    expect(updatedContent).toContain('<!-- CAINIAOSPEC:START -->');
+    expect(updatedContent).toContain('<!-- CAINIAOSPEC:END -->');
     expect(updatedContent).not.toContain('Old body');
 
     expect(consoleSpy).toHaveBeenCalledWith(
@@ -889,7 +897,7 @@ Old body
     await fs.mkdir(path.dirname(auggieApply), { recursive: true });
     await fs.writeFile(
       auggieApply,
-      '---\ndescription: Old\nargument-hint: old\n---\n<!-- OPENSPEC:START -->\nOld\n<!-- OPENSPEC:END -->'
+      '---\ndescription: Old\nargument-hint: old\n---\n<!-- CAINIAOSPEC:START -->\nOld\n<!-- CAINIAOSPEC:END -->'
     );
 
     await updateCommand.execute(testDir);
@@ -915,14 +923,14 @@ Old body
     );
     await fs.mkdir(path.dirname(codeBuddyPath), { recursive: true });
     const initialContent = `---
-name: OpenSpec: Proposal
+name: CainiaoSpec: Proposal
 description: Old description
 category: OpenSpec
 tags: [openspec, change]
 ---
-<!-- OPENSPEC:START -->
+<!-- CAINIAOSPEC:START -->
 Old slash content
-<!-- OPENSPEC:END -->`;
+<!-- CAINIAOSPEC:END -->`;
     await fs.writeFile(codeBuddyPath, initialContent);
 
     const consoleSpy = vi.spyOn(console, 'log');
@@ -930,7 +938,7 @@ Old slash content
     await updateCommand.execute(testDir);
 
     const updated = await fs.readFile(codeBuddyPath, 'utf-8');
-    expect(updated).toContain('name: OpenSpec: Proposal');
+    expect(updated).toContain('name: CainiaoSpec: Proposal');
     expect(updated).toContain('**Guardrails**');
     expect(updated).toContain(
       'Validate with `openspec validate <id> --strict`'
@@ -939,7 +947,7 @@ Old slash content
 
     const [logMessage] = consoleSpy.mock.calls[0];
     expect(logMessage).toContain(
-      'Updated OpenSpec instructions (openspec/AGENTS.md'
+      'Updated CainiaoSpec instructions (cainiaospec/AGENTS.md'
     );
     expect(logMessage).toContain('AGENTS.md (created)');
     expect(logMessage).toContain(
@@ -960,14 +968,14 @@ Old slash content
     await fs.writeFile(
       codeBuddyApply,
       `---
-name: OpenSpec: Apply
+name: CainiaoSpec: Apply
 description: Old description
 category: OpenSpec
 tags: [openspec, apply]
 ---
-<!-- OPENSPEC:START -->
+<!-- CAINIAOSPEC:START -->
 Old body
-<!-- OPENSPEC:END -->`
+<!-- CAINIAOSPEC:END -->`
     );
 
     await updateCommand.execute(testDir);
@@ -993,14 +1001,14 @@ Old body
     );
     await fs.mkdir(path.dirname(crushPath), { recursive: true });
     const initialContent = `---
-name: OpenSpec: Proposal
+name: CainiaoSpec: Proposal
 description: Old description
 category: OpenSpec
 tags: [openspec, change]
 ---
-<!-- OPENSPEC:START -->
+<!-- CAINIAOSPEC:START -->
 Old slash content
-<!-- OPENSPEC:END -->`;
+<!-- CAINIAOSPEC:END -->`;
     await fs.writeFile(crushPath, initialContent);
 
     const consoleSpy = vi.spyOn(console, 'log');
@@ -1008,7 +1016,7 @@ Old slash content
     await updateCommand.execute(testDir);
 
     const updated = await fs.readFile(crushPath, 'utf-8');
-    expect(updated).toContain('name: OpenSpec: Proposal');
+    expect(updated).toContain('name: CainiaoSpec: Proposal');
     expect(updated).toContain('**Guardrails**');
     expect(updated).toContain(
       'Validate with `openspec validate <id> --strict`'
@@ -1017,7 +1025,7 @@ Old slash content
 
     const [logMessage] = consoleSpy.mock.calls[0];
     expect(logMessage).toContain(
-      'Updated OpenSpec instructions (openspec/AGENTS.md'
+      'Updated CainiaoSpec instructions (cainiaospec/AGENTS.md'
     );
     expect(logMessage).toContain('AGENTS.md (created)');
     expect(logMessage).toContain(
@@ -1038,14 +1046,14 @@ Old slash content
     await fs.writeFile(
       crushApply,
       `---
-name: OpenSpec: Apply
+name: CainiaoSpec: Apply
 description: Old description
 category: OpenSpec
 tags: [openspec, apply]
 ---
-<!-- OPENSPEC:START -->
+<!-- CAINIAOSPEC:START -->
 Old body
-<!-- OPENSPEC:END -->`
+<!-- CAINIAOSPEC:END -->`
     );
 
     await updateCommand.execute(testDir);
@@ -1074,9 +1082,9 @@ Old body
 description: "Old description"
 argument-hint: old-hint
 ---
-<!-- OPENSPEC:START -->
+<!-- CAINIAOSPEC:START -->
 Old body
-<!-- OPENSPEC:END -->`;
+<!-- CAINIAOSPEC:END -->`;
     await fs.writeFile(costrictPath, initialContent);
 
     const consoleSpy = vi.spyOn(console, 'log');
@@ -1095,7 +1103,7 @@ Old body
 
     const [logMessage] = consoleSpy.mock.calls[0];
     expect(logMessage).toContain(
-      'Updated OpenSpec instructions (openspec/AGENTS.md'
+      'Updated CainiaoSpec instructions (cainiaospec/AGENTS.md'
     );
     expect(logMessage).toContain('AGENTS.md (created)');
     expect(logMessage).toContain(
@@ -1112,14 +1120,14 @@ Old body
     );
     await fs.mkdir(path.dirname(qoderPath), { recursive: true });
     const initialContent = `---
-name: OpenSpec: Proposal
+name: CainiaoSpec: Proposal
 description: Old description
 category: OpenSpec
 tags: [openspec, change]
 ---
-<!-- OPENSPEC:START -->
+<!-- CAINIAOSPEC:START -->
 Old slash content
-<!-- OPENSPEC:END -->`;
+<!-- CAINIAOSPEC:END -->`;
     await fs.writeFile(qoderPath, initialContent);
 
     const consoleSpy = vi.spyOn(console, 'log');
@@ -1127,7 +1135,7 @@ Old slash content
     await updateCommand.execute(testDir);
 
     const updated = await fs.readFile(qoderPath, 'utf-8');
-    expect(updated).toContain('name: OpenSpec: Proposal');
+    expect(updated).toContain('name: CainiaoSpec: Proposal');
     expect(updated).toContain('**Guardrails**');
     expect(updated).toContain(
       'Validate with `openspec validate <id> --strict`'
@@ -1136,7 +1144,7 @@ Old slash content
 
     const [logMessage] = consoleSpy.mock.calls[0];
     expect(logMessage).toContain(
-      'Updated OpenSpec instructions (openspec/AGENTS.md'
+      'Updated CainiaoSpec instructions (cainiaospec/AGENTS.md'
     );
     expect(logMessage).toContain('AGENTS.md (created)');
     expect(logMessage).toContain(
@@ -1152,13 +1160,13 @@ Old slash content
       '.roo/commands/openspec-proposal.md'
     );
     await fs.mkdir(path.dirname(rooPath), { recursive: true });
-    const initialContent = `# OpenSpec: Proposal
+    const initialContent = `# CainiaoSpec: Proposal
 
 Old description
 
-<!-- OPENSPEC:START -->
+<!-- CAINIAOSPEC:START -->
 Old body
-<!-- OPENSPEC:END -->`;
+<!-- CAINIAOSPEC:END -->`;
     await fs.writeFile(rooPath, initialContent);
 
     const consoleSpy = vi.spyOn(console, 'log');
@@ -1167,7 +1175,7 @@ Old body
 
     const updated = await fs.readFile(rooPath, 'utf-8');
     // For RooCode, the header is Markdown, preserve it and update only managed block
-    expect(updated).toContain('# OpenSpec: Proposal');
+    expect(updated).toContain('# CainiaoSpec: Proposal');
     expect(updated).toContain('**Guardrails**');
     expect(updated).toContain(
       'Validate with `openspec validate <id> --strict`'
@@ -1176,7 +1184,7 @@ Old body
 
     const [logMessage] = consoleSpy.mock.calls[0];
     expect(logMessage).toContain(
-      'Updated OpenSpec instructions (openspec/AGENTS.md'
+      'Updated CainiaoSpec instructions (cainiaospec/AGENTS.md'
     );
     expect(logMessage).toContain('AGENTS.md (created)');
     expect(logMessage).toContain(
@@ -1196,11 +1204,11 @@ Old body
     await fs.mkdir(path.dirname(rooApply), { recursive: true });
     await fs.writeFile(
       rooApply,
-      `# OpenSpec: Apply
+      `# CainiaoSpec: Apply
 
-<!-- OPENSPEC:START -->
+<!-- CAINIAOSPEC:START -->
 Old body
-<!-- OPENSPEC:END -->`
+<!-- CAINIAOSPEC:END -->`
     );
 
     await updateCommand.execute(testDir);
@@ -1233,9 +1241,9 @@ Old body
 description: "Old"
 argument-hint: old
 ---
-<!-- OPENSPEC:START -->
+<!-- CAINIAOSPEC:START -->
 Old
-<!-- OPENSPEC:END -->`
+<!-- CAINIAOSPEC:END -->`
     );
 
     await updateCommand.execute(testDir);
@@ -1265,14 +1273,14 @@ Old
     await fs.writeFile(
       qoderApply,
       `---
-name: OpenSpec: Apply
+name: CainiaoSpec: Apply
 description: Old description
 category: OpenSpec
 tags: [openspec, apply]
 ---
-<!-- OPENSPEC:START -->
+<!-- CAINIAOSPEC:START -->
 Old body
-<!-- OPENSPEC:END -->`
+<!-- CAINIAOSPEC:END -->`
     );
 
     await updateCommand.execute(testDir);
@@ -1298,9 +1306,9 @@ Old body
 
 Some existing CoStrict instructions here.
 
-<!-- OPENSPEC:START -->
+<!-- CAINIAOSPEC:START -->
 Old OpenSpec content
-<!-- OPENSPEC:END -->
+<!-- CAINIAOSPEC:END -->
 
 More instructions after.`;
     await fs.writeFile(costrictPath, initialContent);
@@ -1312,17 +1320,17 @@ More instructions after.`;
 
     // Check that COSTRICT.md was updated
     const updatedContent = await fs.readFile(costrictPath, 'utf-8');
-    expect(updatedContent).toContain('<!-- OPENSPEC:START -->');
-    expect(updatedContent).toContain('<!-- OPENSPEC:END -->');
-    expect(updatedContent).toContain("@/openspec/AGENTS.md");
-    expect(updatedContent).toContain('openspec update');
+    expect(updatedContent).toContain('<!-- CAINIAOSPEC:START -->');
+    expect(updatedContent).toContain('<!-- CAINIAOSPEC:END -->');
+    expect(updatedContent).toContain("@/cainiaospec/AGENTS.md");
+    expect(updatedContent).toContain('cainiaospec update');
     expect(updatedContent).toContain('Some existing CoStrict instructions here');
     expect(updatedContent).toContain('More instructions after');
 
     // Check console output
     const [logMessage] = consoleSpy.mock.calls[0];
     expect(logMessage).toContain(
-      'Updated OpenSpec instructions (openspec/AGENTS.md'
+      'Updated CainiaoSpec instructions (cainiaospec/AGENTS.md'
     );
     expect(logMessage).toContain('AGENTS.md (created)');
     expect(logMessage).toContain('Updated AI tool files: COSTRICT.md');
@@ -1348,7 +1356,13 @@ More instructions after.`;
       '.cospec/openspec/commands/openspec-proposal.md'
     );
     await fs.mkdir(path.dirname(costrictPath), { recursive: true });
-    const initialContent = `## Custom Intro Title\nSome intro text\n<!-- OPENSPEC:START -->\nOld body\n<!-- OPENSPEC:END -->\n\nFooter stays`;
+    const initialContent = `## Custom Intro Title
+Some intro text
+<!-- CAINIAOSPEC:START -->
+Old body
+<!-- CAINIAOSPEC:END -->
+
+Footer stays`;
     await fs.writeFile(costrictPath, initialContent);
 
     await updateCommand.execute(testDir);
@@ -1365,7 +1379,7 @@ More instructions after.`;
     const costrictPath = path.join(testDir, 'COSTRICT.md');
     await fs.writeFile(
       costrictPath,
-      '<!-- OPENSPEC:START -->\nOld\n<!-- OPENSPEC:END -->'
+      '<!-- CAINIAOSPEC:START -->\nOld\n<!-- CAINIAOSPEC:END -->'
     );
 
     const consoleSpy = vi.spyOn(console, 'log');
@@ -1388,7 +1402,7 @@ More instructions after.`;
     expect(errorSpy).toHaveBeenCalled();
     const [logMessage] = consoleSpy.mock.calls[0];
     expect(logMessage).toContain(
-      'Updated OpenSpec instructions (openspec/AGENTS.md'
+      'Updated CainiaoSpec instructions (cainiaospec/AGENTS.md'
     );
     expect(logMessage).toContain('AGENTS.md (created)');
     expect(logMessage).toContain('Failed to update: COSTRICT.md');
@@ -1404,7 +1418,13 @@ More instructions after.`;
       '.windsurf/workflows/openspec-proposal.md'
     );
     await fs.mkdir(path.dirname(wsPath), { recursive: true });
-    const initialContent = `## Custom Intro Title\nSome intro text\n<!-- OPENSPEC:START -->\nOld body\n<!-- OPENSPEC:END -->\n\nFooter stays`;
+    const initialContent = `## Custom Intro Title
+Some intro text
+<!-- CAINIAOSPEC:START -->
+Old body
+<!-- CAINIAOSPEC:END -->
+
+Footer stays`;
     await fs.writeFile(wsPath, initialContent);
 
     await updateCommand.execute(testDir);
@@ -1425,7 +1445,7 @@ More instructions after.`;
     await fs.mkdir(path.dirname(wsApply), { recursive: true });
     await fs.writeFile(
       wsApply,
-      '<!-- OPENSPEC:START -->\nOld\n<!-- OPENSPEC:END -->'
+      '<!-- CAINIAOSPEC:START -->\nOld\n<!-- CAINIAOSPEC:END -->'
     );
 
     await updateCommand.execute(testDir);
@@ -1452,7 +1472,7 @@ More instructions after.`;
     // Should only update OpenSpec instructions
     const [logMessage] = consoleSpy.mock.calls[0];
     expect(logMessage).toContain(
-      'Updated OpenSpec instructions (openspec/AGENTS.md'
+      'Updated CainiaoSpec instructions (cainiaospec/AGENTS.md'
     );
     expect(logMessage).toContain('AGENTS.md (created)');
     consoleSpy.mockRestore();
@@ -1467,7 +1487,7 @@ More instructions after.`;
     await fs.mkdir(path.dirname(claudePath), { recursive: true });
     await fs.writeFile(
       claudePath,
-      '<!-- OPENSPEC:START -->\nOld\n<!-- OPENSPEC:END -->'
+      '<!-- CAINIAOSPEC:START -->\nOld\n<!-- CAINIAOSPEC:END -->'
     );
 
     const consoleSpy = vi.spyOn(console, 'log');
@@ -1476,7 +1496,7 @@ More instructions after.`;
     // Should report updating with new format
     const [logMessage] = consoleSpy.mock.calls[0];
     expect(logMessage).toContain(
-      'Updated OpenSpec instructions (openspec/AGENTS.md'
+      'Updated CainiaoSpec instructions (cainiaospec/AGENTS.md'
     );
     expect(logMessage).toContain('AGENTS.md (created)');
     expect(logMessage).toContain('Updated AI tool files: CLAUDE.md');
@@ -1492,14 +1512,14 @@ More instructions after.`;
     await fs.writeFile(
       proposalPath,
       `---
-name: OpenSpec: Proposal
+name: CainiaoSpec: Proposal
 description: Existing file
 category: OpenSpec
 tags: [openspec, change]
 ---
-<!-- OPENSPEC:START -->
+<!-- CAINIAOSPEC:START -->
 Old content
-<!-- OPENSPEC:END -->`
+<!-- CAINIAOSPEC:END -->`
     );
 
     await updateCommand.execute(testDir);
@@ -1555,15 +1575,21 @@ Old content
     expect(exists).toBe(true);
 
     const content = await fs.readFile(rootAgentsPath, 'utf-8');
-    expect(content).toContain('<!-- OPENSPEC:START -->');
-    expect(content).toContain("@/openspec/AGENTS.md");
-    expect(content).toContain('openspec update');
-    expect(content).toContain('<!-- OPENSPEC:END -->');
+    expect(content).toContain('<!-- CAINIAOSPEC:START -->');
+    expect(content).toContain("@/cainiaospec/AGENTS.md");
+    expect(content).toContain('cainiaospec update');
+    expect(content).toContain('<!-- CAINIAOSPEC:END -->');
   });
 
   it('should refresh root AGENTS.md while preserving surrounding content', async () => {
     const rootAgentsPath = path.join(testDir, 'AGENTS.md');
-    const original = `# Custom intro\n\n<!-- OPENSPEC:START -->\nOld content\n<!-- OPENSPEC:END -->\n\n# Footnotes`;
+    const original = `# Custom intro
+
+<!-- CAINIAOSPEC:START -->
+Old content
+<!-- CAINIAOSPEC:END -->
+
+# Footnotes`;
     await fs.writeFile(rootAgentsPath, original);
 
     const consoleSpy = vi.spyOn(console, 'log');
@@ -1573,29 +1599,29 @@ Old content
     const updated = await fs.readFile(rootAgentsPath, 'utf-8');
     expect(updated).toContain('# Custom intro');
     expect(updated).toContain('# Footnotes');
-    expect(updated).toContain("@/openspec/AGENTS.md");
-    expect(updated).toContain('openspec update');
+    expect(updated).toContain("@/cainiaospec/AGENTS.md");
+    expect(updated).toContain('cainiaospec update');
     expect(updated).not.toContain('Old content');
 
     const [logMessage] = consoleSpy.mock.calls[0];
     expect(logMessage).toContain(
-      'Updated OpenSpec instructions (openspec/AGENTS.md, AGENTS.md)'
+      'Updated CainiaoSpec instructions (cainiaospec/AGENTS.md, AGENTS.md)'
     );
     expect(logMessage).not.toContain('AGENTS.md (created)');
 
     consoleSpy.mockRestore();
   });
 
-  it('should throw error if openspec directory does not exist', async () => {
-    // Remove openspec directory
-    await fs.rm(path.join(testDir, 'openspec'), {
+  it('should throw error if cainiaospec directory does not exist', async () => {
+    // Remove cainiaospec directory
+    await fs.rm(path.join(testDir, 'cainiaospec'), {
       recursive: true,
       force: true,
     });
 
     // Execute update command and expect error
     await expect(updateCommand.execute(testDir)).rejects.toThrow(
-      "No OpenSpec directory found. Run 'openspec init' first."
+      "No CainiaoSpec directory found. Run 'cainiaospec init' first."
     );
   });
 
@@ -1604,7 +1630,7 @@ Old content
     const claudePath = path.join(testDir, 'CLAUDE.md');
     await fs.writeFile(
       claudePath,
-      '<!-- OPENSPEC:START -->\nOld\n<!-- OPENSPEC:END -->'
+      '<!-- CAINIAOSPEC:START -->\nOld\n<!-- CAINIAOSPEC:END -->'
     );
     await fs.chmod(claudePath, 0o444); // Read-only
 
@@ -1628,7 +1654,7 @@ Old content
     expect(errorSpy).toHaveBeenCalled();
     const [logMessage] = consoleSpy.mock.calls[0];
     expect(logMessage).toContain(
-      'Updated OpenSpec instructions (openspec/AGENTS.md'
+      'Updated CainiaoSpec instructions (cainiaospec/AGENTS.md'
     );
     expect(logMessage).toContain('AGENTS.md (created)');
     expect(logMessage).toContain('Failed to update: CLAUDE.md');

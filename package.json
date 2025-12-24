@@ -1,9 +1,9 @@
 {
-  "name": "@fission-ai/openspec",
+  "name": "@fission-ai/cainiaospec",
   "version": "0.16.0",
   "description": "AI-native system for spec-driven development",
   "keywords": [
-    "openspec",
+    "cainiaospec",
     "specs",
     "cli",
     "ai",
@@ -27,7 +27,7 @@
     }
   },
   "bin": {
-    "cainiaospec": "./bin/openspec.js"
+    "cainiaospec": "./bin/cainiaospec.js"
   },
   "files": [
     "dist",
@@ -39,7 +39,7 @@
   "scripts": {
     "build": "node build.js",
     "dev": "tsc --watch",
-    "dev:cli": "pnpm build && node bin/openspec.js",
+    "dev:cli": "pnpm build && node bin/cainiaospec.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
